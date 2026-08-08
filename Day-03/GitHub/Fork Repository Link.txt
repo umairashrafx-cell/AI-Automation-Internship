@@ -1,0 +1,2 @@
+TODO: paste your fork URL here after forking
+(e.g. https://github.com/<your-username>/awesome-n8n-templates)

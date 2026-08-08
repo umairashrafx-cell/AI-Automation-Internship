@@ -1,0 +1,23 @@
+Open-Source Repository (topic: n8n / AI Automation / No-Code Workflows)
+
+https://github.com/enescingoz/awesome-n8n-templates
+
+Why this repo:
+- Directly on-topic for the internship (n8n workflow templates, AI agents, RAG chatbots).
+- Actively maintained, explicitly welcomes PRs that add new template JSON files to the
+  appropriate category folder.
+- Low-friction, genuine "meaningful improvement": contribute the Day-03 Lead Management
+  workflow (Lead_Management_Workflow.json) as a new template under a CRM/Lead-Gen category,
+  plus a short README entry describing it.
+
+TODO (do this on your machine / GitHub account):
+1. git clone https://github.com/enescingoz/awesome-n8n-templates.git
+2. Fork it to your own account first via the GitHub UI, then clone your fork instead.
+3. git checkout -b feature/lead-management-workflow
+4. Add n8n/Lead_Management_Workflow.json (sanitized, no real credentials) into the
+   matching category folder, with a short description added to that folder's README.
+5. git add . && git commit -m "Add Lead Management API n8n workflow template"
+6. git push origin feature/lead-management-workflow
+7. Open a Pull Request from your fork back to enescingoz/awesome-n8n-templates.
+8. Paste your fork link into "Fork Repository Link.txt" and the PR URL into
+   "Pull Request Link.txt" once opened.
