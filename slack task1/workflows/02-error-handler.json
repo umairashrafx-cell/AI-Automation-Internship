@@ -1,0 +1,83 @@
+{
+  "name": "02 — Error Handler → #workflow-errors",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b2000000-0000-4000-8000-000000000001",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#workflow-errors",
+          "mode": "name"
+        },
+        "text": "={{ ($json.workflow.name || '').toLowerCase().includes('prod') ? '<!here> ' : '' }}:rotating_light: *Workflow failed:* {{ $json.workflow.name }}\n\n*Node:* `{{ $json.execution.lastNodeExecuted }}`\n*Error:* {{ $json.execution.error.message }}\n*Execution:* <{{ $json.execution.url }}|open in n8n>\n*Mode:* {{ $json.execution.mode }}",
+        "otherOptions": {
+          "mrkdwn": true,
+          "includeLinkToWorkflow": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "icon_emoji",
+              "icon_emoji": ":rotating_light:",
+              "customUsername": "Error Bot"
+            }
+          }
+        }
+      },
+      "id": "b2000000-0000-4000-8000-000000000002",
+      "name": "Post Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [140, 0],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack — n8n bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "reaction",
+        "operation": "add",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#workflow-errors",
+          "mode": "name"
+        },
+        "timestamp": "={{ $json.ts }}",
+        "name": "eyes"
+      },
+      "id": "b2000000-0000-4000-8000-000000000003",
+      "name": "Mark As Unseen",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [380, 0],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack — n8n bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [[{ "node": "Post Failure", "type": "main", "index": 0 }]]
+    },
+    "Post Failure": {
+      "main": [[{ "node": "Mark As Unseen", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

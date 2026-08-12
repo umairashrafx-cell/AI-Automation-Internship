@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e ' *)",
+      "Bash(TZ=America/Los_Angeles node -e ' *)",
+      "WebFetch(domain:developers.notion.com)",
+      "Bash(python -c ' *)",
+      "Bash(node build.js)",
+      "Bash(node test.js)"
+    ]
+  }
+}
