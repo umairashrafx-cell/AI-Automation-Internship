@@ -1,0 +1,253 @@
+{
+  "name": "Student Registration - Google Sheets to Notion",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1QQKhe72rt9CI4gJ25ZQRyjWPf_5lgxyV7_5wI0U8v4g",
+          "mode": "list",
+          "cachedResultName": "Student Registration Form Responses",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1QQKhe72rt9CI4gJ25ZQRyjWPf_5lgxyV7_5wI0U8v4g/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 939156958,
+          "mode": "list",
+          "cachedResultName": "Form Responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1QQKhe72rt9CI4gJ25ZQRyjWPf_5lgxyV7_5wI0U8v4g/edit#gid=939156958"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "c3c3365a-705e-478f-9712-ec9d4f980f6a",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        80
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "A85AmdLjXeln9aXX",
+          "name": "Google Sheets Trigger account 2"
+        }
+      },
+      "notes": "Fires when a new row (new form submission) is added to the linked Google Sheet."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "name-not-empty",
+              "leftValue": "={{$json[\"Name\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "email-not-empty",
+              "leftValue": "={{$json[\"Email\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f3aaaf2c-bdb4-4729-a3ee-3611a1c24f6d",
+      "name": "Validate Row",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        80
+      ],
+      "notes": "Guards against blank/partial rows before writing to Notion."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "https://app.notion.com/p/9f35ed939ac643e0829301f1e3679c48?v=58dd042a56de435b9aacce052935e55b&source=copy_link",
+          "mode": "url"
+        },
+        "title": "={{$json[\"Name\"]}}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name|title",
+              "title": "={{$json[\"Name\"]}}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{$json[\"Email\"]}}"
+            },
+            {
+              "key": "Course|rich_text",
+              "textContent": "={{$json[\"Course\"]}}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "New"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dce605e7-9d72-4365-9449-322774ca2e58",
+      "name": "Notion - Create Student Record",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "OxEPCUWsuVEXzPMn",
+          "name": "Notion account"
+        }
+      },
+      "notes": "Creates a page in the Student database. Field keys assume Notion property types: Name=Title, Email=Email, Course=Text, Status=Select."
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BQTFJTYPJ",
+          "mode": "id"
+        },
+        "text": "=✅ New student registered: *{{$('Google Sheets Trigger').item.json[\"Name\"]}}* ({{$('Google Sheets Trigger').item.json[\"Course\"]}}) added to Notion.",
+        "otherOptions": {}
+      },
+      "id": "56b92acc-d0bb-4cab-8457-abe116229f77",
+      "name": "Slack - Notify Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        0
+      ],
+      "webhookId": "a6edcab7-62a8-4e93-a626-1c7ee33a9643",
+      "credentials": {
+        "slackApi": {
+          "id": "ienpGOW5jerpeEDb",
+          "name": "Slack account 8"
+        }
+      },
+      "notes": "Optional: posts confirmation to a Slack channel once the Notion record is created."
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BQTFJTYPJ",
+          "mode": "id"
+        },
+        "text": "=⚠️ Skipped a form row with missing Name/Email. Row data: {{JSON.stringify($json)}}",
+        "otherOptions": {}
+      },
+      "id": "77d44593-c698-4fd6-bc5d-a4dba595cd60",
+      "name": "Slack - Alert Invalid Row",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        208
+      ],
+      "webhookId": "a56f4d1f-2a03-49cb-8f13-6d1595e1970b",
+      "credentials": {
+        "slackApi": {
+          "id": "ienpGOW5jerpeEDb",
+          "name": "Slack account 8"
+        }
+      },
+      "notes": "Optional: flags rows that failed validation instead of silently dropping them."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Row": {
+      "main": [
+        [
+          {
+            "node": "Notion - Create Student Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Alert Invalid Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Create Student Record": {
+      "main": [
+        [
+          {
+            "node": "Slack - Notify Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1,
+    "availableInMCP": false
+  },
+  "versionId": "b19e8b3b-3124-4295-9976-7a242e6f5cab",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "q0NnNzw1YkRJIagx",
+  "tags": []
+}
