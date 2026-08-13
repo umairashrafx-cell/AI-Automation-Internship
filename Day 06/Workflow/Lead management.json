@@ -1,0 +1,98 @@
+{
+  "name": "Lead management",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "id"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "tblVKoDKIQGfqbchm",
+          "mode": "id"
+        },
+        "triggerField": "Created Time",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        -240,
+        -32
+      ],
+      "id": "f77e3e73-1603-49a2-8837-5cea5ae18150",
+      "name": "Airtable Trigger",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "https://app.slack.com/client/T0BKX90JTMJ/C0BPYCTBJ0N",
+          "mode": "url"
+        },
+        "text": "=🔔 New Lead Received!      Name: {{ $json.fields['Lead Name'] }}   Source: {{ $json.fields['Source'] }}   Contact: {{ $json.fields['Contact Number'] }}   Interested Service: {{ $json.fields['Interested Service'] }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        -16,
+        -32
+      ],
+      "id": "972bb2bc-13e8-4560-87ef-b1dcda1aa402",
+      "name": "Send a message",
+      "webhookId": "edde5e45-39fa-4f92-85f7-b5a4fcc427ee",
+      "credentials": {
+        "slackApi": {
+          "id": "ienpGOW5jerpeEDb",
+          "name": "Slack account 8"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b4884c89-ed39-4475-93ca-22b8929a7cd8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "cTHYBDc66aueIjOm",
+  "tags": []
+}

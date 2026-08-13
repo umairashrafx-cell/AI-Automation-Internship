@@ -1,0 +1,97 @@
+{
+  "name": "AI Agent Monitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "id"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "tblXvzRqam9EqwlVS",
+          "mode": "id"
+        },
+        "triggerField": "Status Changed Time",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c08e166e-30c2-4d1d-802e-910d25ee5b2e",
+      "name": "Airtable Trigger",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "https://app.slack.com/client/T0BKX90JTMJ/C0BPX6UHCUB",
+          "mode": "url"
+        },
+        "text": "=🤖 AI Agent Status Update    Agent: {{ $json.fields['Agent Name'] }}   Type: {{ $json.fields['Type'] }}   Deployment Status: {{ $json.fields['Deployment Status'] }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "dff8f532-8d4e-4003-ba74-7b7320592337",
+      "name": "Send a message",
+      "webhookId": "a9aa5eac-610b-415a-9f17-0fb3284e1619",
+      "credentials": {
+        "slackApi": {
+          "id": "ienpGOW5jerpeEDb",
+          "name": "Slack account 8"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0a808cae-cb61-4de1-9ee5-38792abd4e20",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "V0cCmDn20VKEEDtw",
+  "tags": []
+}

@@ -1,0 +1,180 @@
+{
+  "name": "Workflow 1 — Task Creation (Notion → Slack)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "event": "pageAddedToDatabase",
+        "databaseId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_NOTION_DATABASE_ID",
+          "mode": "id"
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Notion Trigger",
+      "type": "n8n-nodes-base.notionTrigger",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        0
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_WITH_NOTION_CREDENTIAL_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalise a raw Notion page into flat fields + ready-made Slack blocks.\n// Property names are matched case-insensitively so the workflow survives\n// small differences between task databases.\n\nconst plain = (arr) => (arr || []).map((t) => t.plain_text).join('').trim();\n\nconst pick = (props, ...names) => {\n  const keys = Object.keys(props);\n  for (const name of names) {\n    const key = keys.find((k) => k.toLowerCase() === name.toLowerCase());\n    if (key) return props[key];\n  }\n  return undefined;\n};\n\nconst readText = (p) => (p ? plain(p.title) || plain(p.rich_text) : '');\nconst readChoice = (p) => p?.select?.name || p?.status?.name || '';\nconst readMulti = (p) => (p?.multi_select || []).map((o) => o.name).join(', ');\nconst readPeople = (p) =>\n  (p?.people || [])\n    .map((u) => u.name || u.person?.email)\n    .filter(Boolean)\n    .join(', ');\nconst readDate = (p) => p?.date?.start || '';\n\nconst prettyDate = (iso) => {\n  if (!iso) return '';\n  // Notion sends due dates as plain 'YYYY-MM-DD'. Parsing those as UTC and then\n  // formatting in local time shifts the day backwards west of UTC, so pin them.\n  const dateOnly = !iso.includes('T');\n  const d = new Date(dateOnly ? `${iso}T00:00:00Z` : iso);\n  if (Number.isNaN(d.getTime())) return iso;\n  const opts = dateOnly\n    ? { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }\n    : { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };\n  return d.toLocaleDateString('en-US', opts);\n};\n\nconst PRIORITY_EMOJI = {\n  urgent: ':rotating_light:',\n  high: ':red_circle:',\n  medium: ':large_yellow_circle:',\n  low: ':large_blue_circle:',\n};\n\nconst results = [];\n\nfor (const item of $input.all()) {\n  const page = item.json;\n  const props = page.properties || {};\n\n  // The title column can be named anything, so find it by type first.\n  const titleKey = Object.keys(props).find((k) => props[k]?.type === 'title');\n  const title = titleKey ? plain(props[titleKey].title) : '';\n\n  const status = readChoice(pick(props, 'Status', 'State'));\n  const priority = readChoice(pick(props, 'Priority', 'Urgency'));\n  const assignee = readPeople(pick(props, 'Assignee', 'Owner', 'Assigned to'));\n  const dueDate = readDate(pick(props, 'Due Date', 'Due', 'Deadline'));\n  const project = readChoice(pick(props, 'Project', 'Epic')) || readMulti(pick(props, 'Project'));\n  const tags = readMulti(pick(props, 'Tags', 'Labels'));\n  const notes = readText(pick(props, 'Notes', 'Description', 'Summary'));\n\n  const createdBy = page.created_by?.name || '';\n  const url = page.url || '';\n  const emoji = PRIORITY_EMOJI[priority.toLowerCase()] || ':memo:';\n\n  const fields = [];\n  const addField = (label, value) => {\n    if (value) fields.push({ type: 'mrkdwn', text: `*${label}*\\n${value}` });\n  };\n\n  addField('Status', status);\n  addField('Priority', priority);\n  addField('Assignee', assignee);\n  addField('Due', prettyDate(dueDate));\n  addField('Project', project);\n  addField('Tags', tags);\n\n  const blocks = [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: `${emoji} New task: ${title || 'Untitled'}`.slice(0, 150), emoji: true },\n    },\n  ];\n\n  // Slack allows at most 10 fields in one section.\n  if (fields.length) {\n    blocks.push({ type: 'section', fields: fields.slice(0, 10) });\n  }\n\n  if (notes) {\n    blocks.push({\n      type: 'section',\n      text: { type: 'mrkdwn', text: notes.length > 2800 ? `${notes.slice(0, 2800)}…` : notes },\n    });\n  }\n\n  if (url) {\n    blocks.push({\n      type: 'actions',\n      elements: [\n        {\n          type: 'button',\n          text: { type: 'plain_text', text: 'Open in Notion', emoji: true },\n          url,\n          style: 'primary',\n        },\n      ],\n    });\n  }\n\n  blocks.push({\n    type: 'context',\n    elements: [\n      {\n        type: 'mrkdwn',\n        text: `Created${createdBy ? ` by ${createdBy}` : ''} · ${prettyDate(page.created_time) || 'just now'}`,\n      },\n    ],\n  });\n\n  results.push({\n    json: {\n      pageId: page.id,\n      title,\n      status,\n      priority,\n      assignee,\n      dueDate,\n      project,\n      tags,\n      notes,\n      url,\n      createdBy,\n      createdTime: page.created_time,\n      fallbackText: `New task: ${title || 'Untitled'}${assignee ? ` — ${assignee}` : ''}`,\n      slackPayload: { blocks, text: `New task: ${title || 'Untitled'}` },\n    },\n  });\n}\n\nreturn results;\n"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Format Task",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1000000-0000-4000-8000-000000000001",
+              "leftValue": "={{ $json.title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Has Title?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_SLACK_CHANNEL_ID",
+          "mode": "id",
+          "cachedResultName": "#tasks"
+        },
+        "messageType": "block",
+        "blocksUi": "={{ JSON.stringify($json.slackPayload) }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "unfurl_links": false
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Slack Notification",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        460,
+        -100
+      ],
+      "webhookId": "b1000000-0000-4000-8000-000000000001",
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_SLACK_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Skip (no title)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        460,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Notion Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Task": {
+      "main": [
+        [
+          {
+            "node": "Has Title?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Title?": {
+      "main": [
+        [
+          {
+            "node": "Slack Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip (no title)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "local"
+  },
+  "tags": []
+}

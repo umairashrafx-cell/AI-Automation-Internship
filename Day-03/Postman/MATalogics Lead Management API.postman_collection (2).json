@@ -1,0 +1,87 @@
+{
+  "info": {
+    "_postman_id": "b6f2a1d0-7c3e-4a2f-9e1a-matalogics-day03",
+    "name": "MATalogics Lead Management API",
+    "description": "Postman collection for the MATalogics Day-3 Lead Management API, built on n8n webhooks with Google Sheets as the data store. Covers Create, Get All, Update, and Delete lead operations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Create Lead",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Muhammad Ahmad\",\n  \"email\": \"ahmad@gmail.com\",\n  \"phone\": \"+923001234567\",\n  \"company\": \"MATalogics\",\n  \"interest\": \"AI Automation\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/create-lead",
+          "host": ["{{base_url}}"],
+          "path": ["create-lead"]
+        },
+        "description": "Creates a new lead and appends it as a row in the Lead Management Google Sheet."
+      },
+      "response": []
+    },
+    {
+      "name": "Get All Leads",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/get-leads",
+          "host": ["{{base_url}}"],
+          "path": ["get-leads"]
+        },
+        "description": "Returns all active (non-deleted) leads stored in the Google Sheet."
+      },
+      "response": []
+    },
+    {
+      "name": "Update Lead",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"ahmad@gmail.com\",\n  \"phone\": \"+923111111111\",\n  \"company\": \"MATalogics Pvt Ltd\",\n  \"interest\": \"AI Agents\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/update-lead",
+          "host": ["{{base_url}}"],
+          "path": ["update-lead"]
+        },
+        "description": "Finds the lead row by email and updates phone/company/interest fields."
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Lead",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"ahmad@gmail.com\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/delete-lead",
+          "host": ["{{base_url}}"],
+          "path": ["delete-lead"]
+        },
+        "description": "Soft-deletes the lead by marking its Status column as Deleted."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "{{base_url}}", "type": "string" }
+  ]
+}

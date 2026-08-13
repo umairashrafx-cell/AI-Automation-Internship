@@ -1,0 +1,9 @@
+TODO: paste the shareable link to your "Lead Management" Google Sheet here.
+
+Sheet setup:
+1. Create a new Google Sheet named: Lead Management
+2. Add a tab named: Leads
+3. Header row (columns A-F): Name | Email | Phone | Company | Interest | Status | Created At
+   (Status is used for the soft-delete pattern: Active / Deleted)
+4. Share the sheet with your n8n Google Sheets OAuth2 credential's account, or make it
+   accessible per your n8n instance's auth setup.

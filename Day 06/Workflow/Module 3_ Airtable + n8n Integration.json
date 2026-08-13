@@ -1,0 +1,391 @@
+{
+  "name": "Module 3: Airtable + n8n Integration",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        176,
+        0
+      ],
+      "id": "b8cb0d99-b0aa-458d-93db-1aad9608f298",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Client ID": "CL-004",
+            "Name": "Test Client (n8n)",
+            "Company": "Test Co",
+            "Email": "test@example.com",
+            "Status": "Active"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Client ID",
+              "displayName": "Client ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Active",
+                  "value": "Active"
+                },
+                {
+                  "name": "Inactive",
+                  "value": "Inactive"
+                },
+                {
+                  "name": "Prospect",
+                  "value": "Prospect"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "171a6f78-cf3c-42ea-80ff-309c2b792d45",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "Status": "Inactive"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Client ID",
+              "displayName": "Client ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Active",
+                  "value": "Active"
+                },
+                {
+                  "name": "Inactive",
+                  "value": "Inactive"
+                },
+                {
+                  "name": "Prospect",
+                  "value": "Prospect"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "a805b8be-9f0d-42be-aaf1-509d297a2f26",
+      "name": "Update record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "filterByFormula": "{Status} = \"Active\"",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "f839ba2b-8ee9-43ca-a089-ec1880ab5a9e",
+      "name": "Search records",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "deleteRecord",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "id": "={{ $json.id }}"
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "d695f7ca-dbd4-4bbd-9c4a-9be89a2b9d97",
+      "name": "Delete a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a record": {
+      "main": [
+        [
+          {
+            "node": "Update record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update record": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "Delete a record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "501098f3-75cc-4582-bc83-e0470518ba0c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "yPQF5Px0msbgT3Qi",
+  "tags": []
+}

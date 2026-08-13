@@ -1,0 +1,94 @@
+{
+  "name": "Project Tracking",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "id"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "tblZshpzL0LcgDzES",
+          "mode": "id"
+        },
+        "triggerField": "Status Last Changed",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f1d33a7-ea4c-49bd-9732-4a05d5e0c629",
+      "name": "Airtable Trigger",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "xFP0Nz2FyZJipu49",
+          "name": "Airtable Personal Access Token account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "umairskk@gmail.com",
+        "subject": "=Project Status Update: {{ $json.fields['Project Name'] }}",
+        "emailType": "text",
+        "message": "=📋 Project Status Changed    Project: {{ $json.fields['Project Name'] }}   Assigned To: {{ $json.fields['Assigned To'] }}   New Status: {{ $json.fields['Status'] }}   Deadline: {{ $json.fields['Deadline'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "f4d1dc6f-c2cd-4fe8-a5f9-f2e86d7d96fd",
+      "name": "Send a message",
+      "webhookId": "00111940-188e-4150-86cf-25f3e87b7df3",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bZIwlVtBo3e9rJ0K",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6f0ee529-dfdd-432e-b11e-6939ac65b562",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "YSyc7rMpU348fIqb",
+  "tags": []
+}

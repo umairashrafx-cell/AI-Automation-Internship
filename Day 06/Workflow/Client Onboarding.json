@@ -1,0 +1,317 @@
+{
+  "name": "Client Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "authentication": "airtableTokenApi",
+        "baseId": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "id"
+        },
+        "tableId": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "id"
+        },
+        "triggerField": "Created Time",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8147c8b3-1f84-40c8-9118-bb1991ba978b",
+      "name": "Airtable Trigger",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "filterByFormula": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "982cd48d-9a6b-4590-b20d-c0cef9307be1",
+      "name": "Search records",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const clients = $('Search records').all();\nconst ids = clients\n  .map(c => c.json.fields['Client ID'])\n  .filter(id => id && /^CL-\\d+$/.test(id))\n  .map(id => parseInt(id.split('-')[1], 10));\n\nconst nextNum = ids.length ? Math.max(...ids) + 1 : 1;\nconst nextId = `CL-${String(nextNum).padStart(3, '0')}`;\n\nreturn [{\n  json: {\n    newClientId: nextId,\n    triggerRecordId: $('Airtable Trigger').item.json.id,\n    name: $('Airtable Trigger').item.json.fields['Name'],\n    company: $('Airtable Trigger').item.json.fields['Company']\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "391f8220-299c-43a6-81b9-84f64737696c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "__rl": true,
+          "value": "appqAtUcjqZliQgdS",
+          "mode": "list",
+          "cachedResultName": "MATalogics AI Operations Base - Module 2",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblm10BtZ9z2TUyXK",
+          "mode": "list",
+          "cachedResultName": "Clients",
+          "cachedResultUrl": "https://airtable.com/appqAtUcjqZliQgdS/tblm10BtZ9z2TUyXK"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Client ID": "={{ $json.newClientId }}",
+            "id": "={{ $json.triggerRecordId }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "Client ID",
+              "displayName": "Client ID",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "options",
+              "options": [
+                {
+                  "name": "Active",
+                  "value": "Active"
+                },
+                {
+                  "name": "Inactive",
+                  "value": "Inactive"
+                },
+                {
+                  "name": "Prospect",
+                  "value": "Prospect"
+                }
+              ],
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Created Time",
+              "displayName": "Created Time",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "f63b8582-2adb-45c0-9798-98ffb846e9a6",
+      "name": "Update record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "WuYG0a0YGMHI1Otx",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BPPUQRSMQ",
+          "mode": "id"
+        },
+        "text": "=🎉 New Client Onboarded!\n\nClient ID: {{ $json.fields['Client ID'] }}\nName: {{ $('Code in JavaScript').item.json.name }}\nCompany: {{ $('Code in JavaScript').item.json.company }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        896,
+        0
+      ],
+      "id": "d5d900b8-e62d-4eb0-aed4-d9c0c62a7a91",
+      "name": "Send a message",
+      "webhookId": "c7cd1c53-e0bb-479f-933e-29b7f70409ff",
+      "credentials": {
+        "slackApi": {
+          "id": "ienpGOW5jerpeEDb",
+          "name": "Slack account 8"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Airtable Trigger": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update record": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1704b2d2-19b1-4da9-874e-b78f098cc8a3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7bff6a597a980f962ada45729535f649298bc59ab824a12435d85c6a4fc6d680"
+  },
+  "nodeGroups": [],
+  "id": "o6vIAc7CuObfhPMo",
+  "tags": []
+}

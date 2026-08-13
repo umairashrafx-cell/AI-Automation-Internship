@@ -1,0 +1,105 @@
+{
+  "name": "03 — Daily digest → #project-status",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "c3000000-0000-4000-8000-000000000001",
+      "name": "Every Morning 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-260, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "completed",
+              "value": 7,
+              "type": "number"
+            },
+            {
+              "id": "s2",
+              "name": "inProgress",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "s3",
+              "name": "blocked",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "s4",
+              "name": "blockerNote",
+              "value": "Waiting on client API credentials",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c3000000-0000-4000-8000-000000000002",
+      "name": "Gather Metrics",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-20, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#project-status",
+          "mode": "name"
+        },
+        "text": "=:bar_chart: *Daily status — {{ $now.format('cccc, dd LLL yyyy') }}*\n\n:white_check_mark: Completed: *{{ $json.completed }}*\n:hourglass_flowing_sand: In progress: *{{ $json.inProgress }}*\n:no_entry: Blocked: *{{ $json.blocked }}*\n\n{{ $json.blocked > 0 ? '> _Blocker:_ ' + $json.blockerNote : '_No blockers._' }}",
+        "otherOptions": {
+          "mrkdwn": true,
+          "unfurl_links": false,
+          "botProfile": {
+            "imageValues": {
+              "profilePhotoType": "icon_emoji",
+              "icon_emoji": ":bar_chart:",
+              "customUsername": "Status Bot"
+            }
+          }
+        }
+      },
+      "id": "c3000000-0000-4000-8000-000000000003",
+      "name": "Post Digest",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [220, 0],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack — n8n bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Morning 09:00": {
+      "main": [[{ "node": "Gather Metrics", "type": "main", "index": 0 }]]
+    },
+    "Gather Metrics": {
+      "main": [[{ "node": "Post Digest", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}

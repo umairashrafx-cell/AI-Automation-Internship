@@ -1,0 +1,413 @@
+{
+  "name": "MATalogics Lead Management API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-create",
+      "name": "Webhook - Create Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, -400],
+      "webhookId": "create-lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $input.first().json.body;\nconst errors = [];\n\nif (!b.name || String(b.name).trim() === '') errors.push('name is required');\nif (!b.email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(b.email)) errors.push('valid email is required');\nif (!b.phone || String(b.phone).trim() === '') errors.push('phone is required');\n\nif (errors.length > 0) {\n  return [{ json: { valid: false, errors } }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    name: b.name,\n    email: b.email.toLowerCase().trim(),\n    phone: b.phone,\n    company: b.company || '',\n    interest: b.interest || '',\n    status: 'Active',\n    createdAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "code-validate",
+      "name": "Validate Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [20, -400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-valid",
+      "name": "IF Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, -400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Phone": "={{ $json.phone }}",
+            "Company": "={{ $json.company }}",
+            "Interest": "={{ $json.interest }}",
+            "Status": "={{ $json.status }}",
+            "Created At": "={{ $json.createdAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append",
+      "name": "Google Sheets - Append Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, -460],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Lead created\", \"data\": { \"name\": $json.Name, \"email\": $json.Email, \"phone\": $json.Phone, \"company\": $json.Company, \"interest\": $json.Interest, \"createdAt\": $json[\"Created At\"] } } }}",
+        "options": { "responseCode": 201 }
+      },
+      "id": "resp-create-ok",
+      "name": "Respond - Lead Created",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, -460]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"errors\": $json.errors } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "resp-create-err",
+      "name": "Respond - Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, -320]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "get-leads",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-get",
+      "name": "Webhook - Get All Leads",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, -140],
+      "webhookId": "get-leads"
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "options": {}
+      },
+      "id": "sheets-read",
+      "name": "Google Sheets - Read Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, -140],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-not-deleted",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Deleted",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-active",
+      "name": "Filter - Exclude Deleted",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [240, -140]
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "id": "aggregate-leads",
+      "name": "Aggregate Leads",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [460, -140]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"count\": $json.data.length, \"leads\": $json.data } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "resp-get-ok",
+      "name": "Respond - Leads List",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, -140]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "PUT",
+        "path": "update-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-update",
+      "name": "Webhook - Update Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 120],
+      "webhookId": "update-lead"
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "lookupColumn": "Email",
+        "lookupValue": "={{ $json.body.email }}",
+        "options": {}
+      },
+      "id": "sheets-find-update",
+      "name": "Find Row (Email)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, 120],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-found-update",
+              "leftValue": "={{ $json.Email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-found-update",
+      "name": "IF Row Found",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 120]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["Email"],
+          "value": {
+            "Email": "={{ $json.Email }}",
+            "Phone": "={{ $('Webhook - Update Lead').item.json.body.phone || $json.Phone }}",
+            "Company": "={{ $('Webhook - Update Lead').item.json.body.company || $json.Company }}",
+            "Interest": "={{ $('Webhook - Update Lead').item.json.body.interest || $json.Interest }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-update",
+      "name": "Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 60],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Lead updated\", \"data\": $json } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "resp-update-ok",
+      "name": "Respond - Lead Updated",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 60]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"message\": \"Lead not found\" } }}",
+        "options": { "responseCode": 404 }
+      },
+      "id": "resp-update-404",
+      "name": "Respond - Not Found (Update)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 220]
+    },
+
+    {
+      "parameters": {
+        "httpMethod": "DELETE",
+        "path": "delete-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "wh-delete",
+      "name": "Webhook - Delete Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-200, 400],
+      "webhookId": "delete-lead"
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "lookupColumn": "Email",
+        "lookupValue": "={{ $json.body.email }}",
+        "options": {}
+      },
+      "id": "sheets-find-delete",
+      "name": "Find Row (Email) ",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [20, 400],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-found-delete",
+              "leftValue": "={{ $json.Email }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-found-delete",
+      "name": "IF Row Found ",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "value": "REPLACE_WITH_SHEET_ID", "mode": "id" },
+        "sheetName": { "__rl": true, "value": "Leads", "mode": "name" },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "matchingColumns": ["Email"],
+          "value": {
+            "Email": "={{ $json.Email }}",
+            "Status": "Deleted"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-delete",
+      "name": "Delete Row (Soft Delete)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [460, 340],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_WITH_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": true, \"message\": \"Lead deleted\" } }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "resp-delete-ok",
+      "name": "Respond - Lead Deleted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 340]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"success\": false, \"message\": \"Lead not found\" } }}",
+        "options": { "responseCode": 404 }
+      },
+      "id": "resp-delete-404",
+      "name": "Respond - Not Found (Delete)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [460, 500]
+    }
+  ],
+  "connections": {
+    "Webhook - Create Lead": { "main": [[{ "node": "Validate Data", "type": "main", "index": 0 }]] },
+    "Validate Data": { "main": [[{ "node": "IF Valid", "type": "main", "index": 0 }]] },
+    "IF Valid": {
+      "main": [
+        [{ "node": "Google Sheets - Append Row", "type": "main", "index": 0 }],
+        [{ "node": "Respond - Validation Error", "type": "main", "index": 0 }]
+      ]
+    },
+    "Google Sheets - Append Row": { "main": [[{ "node": "Respond - Lead Created", "type": "main", "index": 0 }]] },
+
+    "Webhook - Get All Leads": { "main": [[{ "node": "Google Sheets - Read Rows", "type": "main", "index": 0 }]] },
+    "Google Sheets - Read Rows": { "main": [[{ "node": "Filter - Exclude Deleted", "type": "main", "index": 0 }]] },
+    "Filter - Exclude Deleted": { "main": [[{ "node": "Aggregate Leads", "type": "main", "index": 0 }]] },
+    "Aggregate Leads": { "main": [[{ "node": "Respond - Leads List", "type": "main", "index": 0 }]] },
+
+    "Webhook - Update Lead": { "main": [[{ "node": "Find Row (Email)", "type": "main", "index": 0 }]] },
+    "Find Row (Email)": { "main": [[{ "node": "IF Row Found", "type": "main", "index": 0 }]] },
+    "IF Row Found": {
+      "main": [
+        [{ "node": "Update Row", "type": "main", "index": 0 }],
+        [{ "node": "Respond - Not Found (Update)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Row": { "main": [[{ "node": "Respond - Lead Updated", "type": "main", "index": 0 }]] },
+
+    "Webhook - Delete Lead": { "main": [[{ "node": "Find Row (Email) ", "type": "main", "index": 0 }]] },
+    "Find Row (Email) ": { "main": [[{ "node": "IF Row Found ", "type": "main", "index": 0 }]] },
+    "IF Row Found ": {
+      "main": [
+        [{ "node": "Delete Row (Soft Delete)", "type": "main", "index": 0 }],
+        [{ "node": "Respond - Not Found (Delete)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Delete Row (Soft Delete)": { "main": [[{ "node": "Respond - Lead Deleted", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {},
+  "meta": { "instanceId": "matalogics-day03-lead-management" }
+}

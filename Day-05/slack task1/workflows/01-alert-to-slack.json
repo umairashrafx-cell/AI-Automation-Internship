@@ -1,0 +1,117 @@
+{
+  "name": "01 — Alert to #n8n-alerts (with thread)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "When clicking Execute",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-260, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "job",
+              "value": "Nightly client data sync",
+              "type": "string"
+            },
+            {
+              "id": "f2",
+              "name": "records",
+              "value": 1284,
+              "type": "number"
+            },
+            {
+              "id": "f3",
+              "name": "source",
+              "value": "Airtable → Postgres",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Sample Run Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#n8n-alerts",
+          "mode": "name"
+        },
+        "text": "=:arrows_counterclockwise: *{{ $json.job }}* started\n_Source:_ {{ $json.source }}",
+        "otherOptions": {
+          "mrkdwn": true,
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Post Start",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [200, 0],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack — n8n bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "accessToken",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#n8n-alerts",
+          "mode": "name"
+        },
+        "text": "=:white_check_mark: Finished — *{{ $('Sample Run Data').item.json.records }}* records processed, 0 errors.",
+        "otherOptions": {
+          "mrkdwn": true,
+          "thread_ts": {
+            "replyValues": {
+              "thread_ts": "={{ $json.ts }}",
+              "reply_broadcast": false
+            }
+          }
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Reply In Thread",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [440, 0],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack — n8n bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking Execute": {
+      "main": [[{ "node": "Sample Run Data", "type": "main", "index": 0 }]]
+    },
+    "Sample Run Data": {
+      "main": [[{ "node": "Post Start", "type": "main", "index": 0 }]]
+    },
+    "Post Start": {
+      "main": [[{ "node": "Reply In Thread", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "pinData": {}
+}
