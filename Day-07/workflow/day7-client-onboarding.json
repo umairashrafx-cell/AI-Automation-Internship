@@ -1,0 +1,768 @@
+{
+  "name": "Day 7 - AI Client Onboarding System",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-client-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "vapi-webhook",
+      "name": "Vapi Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -620,
+        300
+      ],
+      "webhookId": "a1b2c3d4-day7-client-intake"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// STEP 1 - NORMALISE THE INCOMING VAPI PAYLOAD\n// ------------------------------------------------------------\n// Vapi can hit this webhook in three shapes, plus we want to be\n// able to test with a plain flat JSON body from Postman / curl.\n//   A) Tool call    -> body.message.toolCalls[0].function.arguments\n//   B) Older format -> body.message.toolCallList[0].function.arguments\n//   C) End of call  -> body.message.analysis.structuredData\n//   D) Flat test    -> body.client_name, body.budget, ...\n// This node flattens all of them into one clean object.\n// ============================================================\n\nconst body = $input.first().json.body || $input.first().json;\nconst msg  = body.message || {};\n\nlet args = {};\nlet toolCallId = null;\n\n// A) modern Vapi tool-call format\nconst toolCalls = msg.toolCalls || msg.toolCallList || msg.tool_calls || [];\nif (Array.isArray(toolCalls) && toolCalls.length > 0) {\n  const call = toolCalls[0];\n  toolCallId = call.id || call.toolCallId || null;\n  const fn = call.function || {};\n  args = typeof fn.arguments === 'string' ? JSON.parse(fn.arguments) : (fn.arguments || {});\n}\n\n// C) end-of-call-report structured data\nif (Object.keys(args).length === 0 && msg.analysis && msg.analysis.structuredData) {\n  args = msg.analysis.structuredData;\n}\n\n// D) flat body (manual testing)\nif (Object.keys(args).length === 0) {\n  args = body;\n}\n\n// ---- clean each field -------------------------------------\nconst str = (v, fallback = 'NOT PROVIDED') => {\n  if (v === null || v === undefined) return fallback;\n  const s = String(v).trim();\n  return s.length ? s : fallback;\n};\n\n// Budget can arrive as 500000, \"500,000\", \"PKR 500000\", \"5 lakh\", \"500k\"\nfunction parseBudget(raw) {\n  if (typeof raw === 'number' && isFinite(raw)) return Math.round(raw);\n  let s = String(raw || '').toLowerCase().trim();\n  if (!s) return 0;\n\n  const lakh    = /(\\d+(?:\\.\\d+)?)\\s*(lakh|lac|lakhs)/.exec(s);\n  const crore   = /(\\d+(?:\\.\\d+)?)\\s*(crore|cr)\\b/.exec(s);\n  const million = /(\\d+(?:\\.\\d+)?)\\s*(m|million)\\b/.exec(s);\n  const kilo    = /(\\d+(?:\\.\\d+)?)\\s*k\\b/.exec(s);\n\n  if (crore)   return Math.round(parseFloat(crore[1])   * 10000000);\n  if (lakh)    return Math.round(parseFloat(lakh[1])    * 100000);\n  if (million) return Math.round(parseFloat(million[1]) * 1000000);\n  if (kilo)    return Math.round(parseFloat(kilo[1])    * 1000);\n\n  const digits = s.replace(/[^0-9.]/g, '');\n  const n = parseFloat(digits);\n  return isFinite(n) ? Math.round(n) : 0;\n}\n\nconst clean = {\n  client_name:         str(args.client_name || args.clientName || args.name),\n  company_name:        str(args.company_name || args.companyName || args.company),\n  email:               str(args.email).toLowerCase().replace(/\\s+/g, ''),\n  service_required:    str(args.service_required || args.serviceRequired || args.service),\n  project_description: str(args.project_description || args.projectDescription || args.description),\n  budget:              parseBudget(args.budget),\n  tool_call_id:        toolCallId,\n  call_id:             msg.call ? (msg.call.id || null) : (body.call_id || null),\n  received_at:         new Date().toISOString(),\n};\n\nreturn [{ json: clean }];"
+      },
+      "id": "normalize-vapi-payload",
+      "name": "Normalize Vapi Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "openai-chat-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -140,
+        500
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_OPENAI_CRED_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a lead qualification analyst for a digital services agency in Pakistan. You classify inbound client enquiries captured by a voice agent.\n\nReturn ONLY a raw JSON object. No prose, no explanation, no markdown code fences.\n\nThe JSON must have exactly these four keys:\n{\n  \"service_category\": \"<one of: Web Development | Mobile App Development | Web & Mobile Development | E-Commerce | AI & Automation | Branding & Design | Digital Marketing | Other>\",\n  \"priority\": \"<HIGH | MEDIUM | LOW>\",\n  \"summary\": \"<one clear sentence, max 25 words, describing what this client needs>\",\n  \"next_action\": \"<a short concrete next step for the sales team, max 8 words>\"\n}\n\nPriority rules (budget is in PKR):\n- budget >= 500000            -> HIGH\n- budget 200000 to 499999     -> MEDIUM\n- budget < 200000             -> LOW\n\n--- CLIENT ENQUIRY ---\nClient name: {{ $json.client_name }}\nCompany: {{ $json.company_name }}\nEmail: {{ $json.email }}\nService required: {{ $json.service_required }}\nProject description: {{ $json.project_description }}\nBudget (PKR): {{ $json.budget }}\n--- END ---\n\nJSON:",
+        "messages": {}
+      },
+      "id": "classify-enquiry-ai",
+      "name": "Classify Enquiry (AI)",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// STEP 3 - PARSE THE AI OUTPUT + ENFORCE THE PRIORITY RULE\n// ------------------------------------------------------------\n// The LLM writes the category / summary / next action.\n// The PRIORITY, however, is a hard business rule, so we compute\n// it in code. The AI never gets to override it. This is what\n// makes the three required test calls pass deterministically:\n//   budget >= 500000            -> HIGH\n//   budget 200000 .. 499999     -> MEDIUM\n//   budget <  200000            -> LOW\n// ============================================================\n\nconst intake = $('Normalize Vapi Payload').first().json;\n\n// ---- 1. pull the model's raw text -------------------------\nconst aiItem = $input.first().json;\nlet raw = aiItem.text || aiItem.output || aiItem.response || aiItem.content || '';\nif (typeof raw === 'object') raw = JSON.stringify(raw);\n\n// ---- 2. parse it, tolerating markdown fences --------------\nlet ai = {};\ntry {\n  const fenced = /```(?:json)?\\s*([\\s\\S]*?)```/.exec(raw);\n  const candidate = fenced ? fenced[1] : raw;\n  const start = candidate.indexOf('{');\n  const end   = candidate.lastIndexOf('}');\n  ai = JSON.parse(start !== -1 ? candidate.slice(start, end + 1) : candidate);\n} catch (e) {\n  // Never let a malformed LLM response kill the onboarding.\n  ai = {};\n}\n\n// ---- 3. deterministic priority ----------------------------\nconst budget = Number(intake.budget) || 0;\nlet priority = 'LOW';\nif (budget >= 500000)      priority = 'HIGH';\nelse if (budget >= 200000) priority = 'MEDIUM';\n\n// ---- 4. priority-driven Slack presentation ----------------\nconst PRESET = {\n  HIGH:   { headline: 'HIGH PRIORITY CLIENT',   emoji: ':rotating_light:', color: '#E01E5A', sla: 'Contact within 2 hours' },\n  MEDIUM: { headline: 'MEDIUM PRIORITY CLIENT', emoji: ':large_orange_diamond:', color: '#ECB22E', sla: 'Contact within 24 hours' },\n  LOW:    { headline: 'STANDARD CLIENT',        emoji: ':white_check_mark:', color: '#2EB67D', sla: 'Contact within 3 business days' },\n}[priority];\n\nconst fmtPKR = 'PKR ' + budget.toLocaleString('en-US');\n\nreturn [{\n  json: {\n    // intake fields\n    client_name:         intake.client_name,\n    company_name:        intake.company_name,\n    email:               intake.email,\n    service_required:    intake.service_required,\n    project_description: intake.project_description,\n    budget:              budget,\n    budget_formatted:    fmtPKR,\n    tool_call_id:        intake.tool_call_id,\n    call_id:             intake.call_id,\n\n    // AI fields\n    service_category: ai.service_category || intake.service_required,\n    summary:          ai.summary || intake.project_description,\n    next_action:      ai.next_action || 'Schedule discovery call',\n\n    // business rule\n    priority:         priority,\n    status:           'New',\n    created_at:       new Date().toISOString(),\n\n    // slack presentation\n    slack_headline: PRESET.headline,\n    slack_emoji:    PRESET.emoji,\n    slack_color:    PRESET.color,\n    slack_sla:      PRESET.sla,\n  }\n}];"
+      },
+      "id": "classify-with-ai",
+      "name": "Classify with AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_AIRTABLE_BASE_ID",
+          "cachedResultName": "AI Client Onboarding"
+        },
+        "table": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_AIRTABLE_TABLE_ID",
+          "cachedResultName": "Client Onboarding"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Client Name": "={{ $json.client_name }}",
+            "Company": "={{ $json.company_name }}",
+            "Email": "={{ $json.email }}",
+            "Service": "={{ $json.service_required }}",
+            "Description": "={{ $json.project_description }}",
+            "Budget": "={{ $json.budget }}",
+            "Category": "={{ $json.service_category }}",
+            "Priority": "={{ $json.priority }}",
+            "Summary": "={{ $json.summary }}",
+            "Status": "New",
+            "Created At": "={{ $json.created_at }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "typecast": true
+        }
+      },
+      "id": "airtable---create-client-record",
+      "name": "Airtable - Create Client Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        300
+      ],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_AIRTABLE_CRED_ID",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "REPLACE_NOTION_DATABASE_ID",
+          "cachedResultName": "Client Projects"
+        },
+        "title": "={{ $('Classify with AI').item.json.company_name }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Client|rich_text",
+              "textContent": "={{ $('Classify with AI').item.json.client_name }}"
+            },
+            {
+              "key": "Email|email",
+              "emailValue": "={{ $('Classify with AI').item.json.email }}"
+            },
+            {
+              "key": "Service|rich_text",
+              "textContent": "={{ $('Classify with AI').item.json.service_category }}"
+            },
+            {
+              "key": "Budget|number",
+              "numberValue": "={{ $('Classify with AI').item.json.budget }}"
+            },
+            {
+              "key": "Priority|select",
+              "selectValue": "={{ $('Classify with AI').item.json.priority }}"
+            },
+            {
+              "key": "Status|select",
+              "selectValue": "New"
+            },
+            {
+              "key": "Next Action|rich_text",
+              "textContent": "={{ $('Classify with AI').item.json.next_action }}"
+            },
+            {
+              "key": "Created At|date",
+              "date": "={{ $('Classify with AI').item.json.created_at }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notion---create-onboarding-page",
+      "name": "Notion - Create Onboarding Page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "block",
+        "blockId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.id }}"
+        },
+        "blockUi": {
+          "blockValues": [
+            {
+              "type": "heading_2",
+              "textContent": "=Onboarding Details"
+            },
+            {
+              "type": "paragraph",
+              "textContent": "=Client: {{ $json.client_name }}\nCompany: {{ $json.company_name }}\nEmail: {{ $json.email }}\nService: {{ $json.service_category }}\nBudget: {{ $json.budget_formatted }}\nPriority: {{ $json.priority }}\nSummary: {{ $json.summary }}\nNext Action: {{ $json.next_action }}\nStatus: New"
+            },
+            {
+              "type": "to_do",
+              "textContent": "=Send welcome email to {{ $('Classify with AI').item.json.email }}"
+            },
+            {
+              "type": "to_do",
+              "textContent": "={{ $('Classify with AI').item.json.next_action }}"
+            },
+            {
+              "type": "to_do",
+              "textContent": "=Prepare proposal and quotation"
+            }
+          ]
+        }
+      },
+      "id": "notion---append-page-content",
+      "name": "Notion - Append Page Content",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        800,
+        300
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_NOTION_CRED_ID",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// STEP 6 - REBUILD THE CONTEXT FOR THE SLACK BRANCH\n// ------------------------------------------------------------\n// Airtable and Notion each return their OWN API response, so by\n// this point $json is a Notion block object, not our client.\n// We reach back to the classifier node and also carry the two\n// record IDs so the Slack message can confirm both were written.\n// ============================================================\n\nconst c = $('Classify with AI').first().json;\n\nlet airtable_id = null;\nlet notion_url  = null;\ntry { airtable_id = $('Airtable - Create Client Record').first().json.id || null; } catch (e) {}\ntry {\n  const n = $('Notion - Create Onboarding Page').first().json;\n  notion_url = n.url || n.id || null;\n} catch (e) {}\n\nreturn [{ json: { ...c, airtable_id, notion_url } }];"
+      },
+      "id": "prepare-notification",
+      "name": "Prepare Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-high",
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "HIGH",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "HIGH"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-medium",
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "MEDIUM",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "MEDIUM"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cond-low",
+                    "leftValue": "={{ $json.priority }}",
+                    "rightValue": "LOW",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LOW"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "UNKNOWN"
+        }
+      },
+      "id": "route-by-priority",
+      "name": "Route by Priority",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#new-clients"
+        },
+        "text": "=:mega: *NEW CLIENT* {{ $json.slack_emoji }} *{{ $json.slack_headline }}*\n\n*{{ $json.client_name }} - {{ $json.company_name }}*\n\n> *Service:* {{ $json.service_category }}\n> *Budget:* {{ $json.budget_formatted }}\n> *Priority:* {{ $json.priority }}\n> *Email:* {{ $json.email }}\n\n*AI Summary:* {{ $json.summary }}\n*Next Action:* {{ $json.next_action }}\n*SLA:* {{ $json.slack_sla }}\n\n:white_check_mark: Airtable + Notion records created successfully.\n\n<!channel> This is a high value lead - please pick it up now.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "slack---high-priority-alert",
+      "name": "Slack - HIGH Priority Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        100
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_SLACK_CRED_ID",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "slack-high"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#new-clients"
+        },
+        "text": "=:mega: *NEW CLIENT* {{ $json.slack_emoji }} *{{ $json.slack_headline }}*\n\n*{{ $json.client_name }} - {{ $json.company_name }}*\n\n> *Service:* {{ $json.service_category }}\n> *Budget:* {{ $json.budget_formatted }}\n> *Priority:* {{ $json.priority }}\n> *Email:* {{ $json.email }}\n\n*AI Summary:* {{ $json.summary }}\n*Next Action:* {{ $json.next_action }}\n*SLA:* {{ $json.slack_sla }}\n\n:white_check_mark: Airtable + Notion records created successfully.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "slack---medium-priority-alert",
+      "name": "Slack - MEDIUM Priority Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        300
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_SLACK_CRED_ID",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "slack-medium"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#new-clients"
+        },
+        "text": "=:mega: *NEW CLIENT* {{ $json.slack_emoji }} *{{ $json.slack_headline }}*\n\n*{{ $json.client_name }} - {{ $json.company_name }}*\n\n> *Service:* {{ $json.service_category }}\n> *Budget:* {{ $json.budget_formatted }}\n> *Priority:* {{ $json.priority }}\n> *Email:* {{ $json.email }}\n\n*AI Summary:* {{ $json.summary }}\n*Next Action:* {{ $json.next_action }}\n*SLA:* {{ $json.slack_sla }}\n\n:white_check_mark: Airtable + Notion records created successfully.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "slack---low-priority-alert",
+      "name": "Slack - LOW Priority Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        500
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_SLACK_CRED_ID",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "slack-low"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#new-clients"
+        },
+        "text": "=:warning: A client enquiry came in that could not be prioritised. Client: {{ $json.client_name }} ({{ $json.company_name }}), budget {{ $json.budget_formatted }}. Please review manually.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false,
+          "mrkdwn": true
+        }
+      },
+      "id": "slack---unclassified-fallback",
+      "name": "Slack - Unclassified Fallback",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1520,
+        700
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_SLACK_CRED_ID",
+          "name": "Slack account"
+        }
+      },
+      "webhookId": "slack-fallback"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ============================================================\n// STEP 8 - REPLY TO VAPI\n// ------------------------------------------------------------\n// Vapi expects { results: [ { toolCallId, result } ] } so the\n// voice agent can speak a confirmation back to the caller.\n// ============================================================\n\nconst c = $('Prepare Notification').first().json;\n\nconst spoken = 'Thanks ' + c.client_name + ', I have logged ' + c.company_name +\n  ' for ' + c.service_category + '. Our team has been notified and will ' +\n  c.next_action.toLowerCase() + '.';\n\nreturn [{\n  json: {\n    results: [{ toolCallId: c.tool_call_id || 'manual-test', result: spoken }],\n    // extra debug info, harmless to Vapi\n    meta: {\n      priority: c.priority,\n      airtable_id: c.airtable_id,\n      notion_url: c.notion_url,\n    }\n  }\n}];"
+      },
+      "id": "build-vapi-response",
+      "name": "Build Vapi Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "respond-to-vapi",
+      "name": "Respond to Vapi",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Voice intake\nVapi calls this webhook with the six fields the\n**Client Onboarding Agent** collected.\nThe Code node flattens every Vapi payload shape\n(tool call, end-of-call report, or flat test JSON).",
+        "height": 200,
+        "width": 500,
+        "color": 4
+      },
+      "id": "sticky-0",
+      "name": "Sticky Note 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -660,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. AI processing\nThe LLM writes the service category, summary and\nnext action. The **priority is computed in code**\nfrom the budget so the three required test calls\nare 100% deterministic.",
+        "height": 200,
+        "width": 480,
+        "color": 5
+      },
+      "id": "sticky-1",
+      "name": "Sticky Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -200,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Fan out\nAirtable = system of record.\nNotion = the onboarding page + checklist.\nSlack = priority-based team alert.",
+        "height": 200,
+        "width": 700,
+        "color": 3
+      },
+      "id": "sticky-2",
+      "name": "Sticky Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        300,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Priority-based alerts\nHIGH -> HIGH PRIORITY CLIENT (+ @channel)\nMEDIUM -> MEDIUM PRIORITY CLIENT\nLOW -> STANDARD CLIENT",
+        "height": 180,
+        "width": 420,
+        "color": 6
+      },
+      "id": "sticky-3",
+      "name": "Sticky Note 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1240,
+        780
+      ]
+    }
+  ],
+  "connections": {
+    "Vapi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Vapi Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Vapi Payload": {
+      "main": [
+        [
+          {
+            "node": "Classify Enquiry (AI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Classify Enquiry (AI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Enquiry (AI)": {
+      "main": [
+        [
+          {
+            "node": "Classify with AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify with AI": {
+      "main": [
+        [
+          {
+            "node": "Airtable - Create Client Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable - Create Client Record": {
+      "main": [
+        [
+          {
+            "node": "Notion - Create Onboarding Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Create Onboarding Page": {
+      "main": [
+        [
+          {
+            "node": "Notion - Append Page Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Append Page Content": {
+      "main": [
+        [
+          {
+            "node": "Prepare Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Notification": {
+      "main": [
+        [
+          {
+            "node": "Route by Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Priority": {
+      "main": [
+        [
+          {
+            "node": "Slack - HIGH Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - MEDIUM Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - LOW Priority Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack - Unclassified Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - HIGH Priority Alert": {
+      "main": [
+        [
+          {
+            "node": "Build Vapi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - MEDIUM Priority Alert": {
+      "main": [
+        [
+          {
+            "node": "Build Vapi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - LOW Priority Alert": {
+      "main": [
+        [
+          {
+            "node": "Build Vapi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack - Unclassified Fallback": {
+      "main": [
+        [
+          {
+            "node": "Build Vapi Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Vapi Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "versionId": "day7-v1",
+  "meta": {
+    "instanceId": "day7-ai-client-onboarding"
+  },
+  "tags": []
+}
