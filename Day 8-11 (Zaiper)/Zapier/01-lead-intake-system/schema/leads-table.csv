@@ -1,0 +1,5 @@
+Lead ID,Name,Email,Phone,Company,Industry,Budget,Lead Source,Requirement,Urgency,Lead Score,Status,Created At
+LEAD-2026-001,Ahmad Raza,ahmad@abccompany.com,+92-300-1234567,ABC Company,Manufacturing,8000,LinkedIn,Need an end-to-end automation audit for our order desk,High,75,New,2026-08-24T09:14:00Z
+LEAD-2026-002,Sana Khalid,sana@brightretail.pk,+92-321-9876543,Bright Retail,Retail,3000,Website,Shopify to WhatsApp order notification flow,Medium,40,New,2026-08-24T10:02:00Z
+LEAD-2026-003,Bilal Ahmed,bilal@nexuslogistics.com,+92-333-5551212,Nexus Logistics,Logistics,500,Instagram,Just exploring options for now,Low,20,New,2026-08-24T11:47:00Z
+LEAD-2026-004,Hira Nadeem,hira@medcarepk.com,+92-345-2223344,MedCare Clinics,Healthcare,12000,Referral,Patient intake and reminders across three branches,High,80,New,2026-08-24T13:20:00Z

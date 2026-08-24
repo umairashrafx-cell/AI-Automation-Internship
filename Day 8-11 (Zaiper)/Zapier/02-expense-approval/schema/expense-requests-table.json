@@ -1,0 +1,26 @@
+{
+  "table": "Expense Requests",
+  "description": "Every expense submitted through the Employee Expense Portal interface.",
+  "columns": [
+    { "name": "Request ID",      "type": "text",      "unique": true, "source": "Code step: request-id-generator.js -> requestId", "example": "EXP-0045" },
+    { "name": "Employee",        "type": "text",      "required": true, "source": "Form: Employee Name" },
+    { "name": "Department",      "type": "dropdown",  "options": ["Engineering", "Sales", "Marketing", "Operations", "Finance", "HR"], "source": "Form: Department" },
+    { "name": "Type",            "type": "dropdown",  "options": ["Travel", "Food", "Software", "Equipment", "Other"], "source": "Form: Expense Type" },
+    { "name": "Amount",          "type": "number",    "required": true, "source": "Form: Amount" },
+    { "name": "Description",     "type": "long_text", "source": "Form: Description" },
+    { "name": "Receipt",         "type": "file",      "required": false, "source": "Form: Receipt Upload", "notes": "Deliberately optional - the Receipt Required rule depends on this being empty sometimes." },
+    { "name": "Manager",         "type": "email",     "required": true, "source": "Form: Manager Email" },
+    { "name": "Approval Status", "type": "dropdown",  "options": ["Approved", "Pending Manager Approval", "Pending Manager + Finance Approval", "Receipt Required", "Rejected"], "source": "Code step: risk-assessment.js -> approvalStatus" },
+    { "name": "Risk Level",      "type": "dropdown",  "options": ["Low", "Medium", "High"], "source": "Code step: risk-assessment.js -> riskLevel" },
+    { "name": "Submitted At",    "type": "datetime",  "source": "Code step: request-id-generator.js -> submittedAt" }
+  ],
+  "riskRules": {
+    "Low":    { "condition": "amount < 100",           "action": "Automatically mark Approved" },
+    "Medium": { "condition": "amount >= 100 && <= 500", "action": "Send approval request to manager" },
+    "High":   { "condition": "amount > 500",            "action": "Send approval request to manager + finance" }
+  },
+  "override": {
+    "condition": "receipt is missing",
+    "effect": "Approval Status = 'Receipt Required'; no approver notified; Risk Level unchanged"
+  }
+}

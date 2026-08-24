@@ -1,0 +1,24 @@
+{
+  "table": "Appointments",
+  "description": "Appointments booked through the CityCare Clinic chatbot.",
+  "clinic": {
+    "hours": "Monday to Saturday, 09:00-19:00. Closed Sunday.",
+    "slotLength": "1 hour, on the hour",
+    "doctors": [
+      { "name": "Dr. Ahmed", "specialty": "General Physician" },
+      { "name": "Dr. Sara",  "specialty": "Dermatologist" },
+      { "name": "Dr. Ali",   "specialty": "Cardiologist" }
+    ]
+  },
+  "columns": [
+    { "name": "Appointment ID", "type": "text",      "unique": true, "source": "Code step: availability-check.js -> appointmentId", "example": "APT-0058" },
+    { "name": "Patient",        "type": "text",      "source": "Chatbot: patient_name" },
+    { "name": "Phone",          "type": "text",      "source": "Chatbot: phone" },
+    { "name": "Doctor",         "type": "dropdown",  "options": ["Dr. Ahmed", "Dr. Sara", "Dr. Ali"], "source": "Code step: parse-booking-request.js -> doctor" },
+    { "name": "Date",           "type": "date",      "format": "YYYY-MM-DD", "source": "Code step: parse-booking-request.js -> date" },
+    { "name": "Time",           "type": "text",      "format": "HH:MM 24-hour", "source": "Code step: parse-booking-request.js -> time", "notes": "Stored as text so exact-match search is reliable; a Time column type can normalise the value and break the lookup." },
+    { "name": "Reason",         "type": "long_text", "source": "Chatbot: reason" },
+    { "name": "Status",         "type": "dropdown",  "options": ["Confirmed", "Completed", "Cancelled", "No Show"], "default": "Confirmed" },
+    { "name": "Slot Key",       "type": "text",      "source": "Code step: parse-booking-request.js -> slotKey", "example": "Dr. Sara|2026-08-25|16:00", "notes": "Double-booking guard. Search this single column instead of matching Doctor + Date + Time separately." }
+  ]
+}

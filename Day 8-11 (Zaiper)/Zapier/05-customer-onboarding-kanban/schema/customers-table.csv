@@ -1,0 +1,5 @@
+Customer ID,Client Name,Company,Email,Service,Project Budget,Start Date,Requirements,Account Manager,Account Manager Email,Tier,Stage,Due Date,Stage Changed At,Created At
+CUST-0109,Rabia Aslam,Vertex Foods,rabia@vertexfoods.pk,AI Automation,65000,2026-09-01,Automate supplier onboarding and invoice matching,Umair Ashraf,umair@company.com,Enterprise,In Progress,2026-09-08,2026-08-21T10:00:00Z,2026-08-14T09:12:00Z
+CUST-0110,Tariq Mehmood,Skyline Interiors,tariq@skylineint.com,Web Development,18000,2026-09-05,Portfolio site with a project enquiry funnel,Hassan Raza,hassan@company.com,Mid-Market,Qualified,2026-09-12,2026-08-19T14:30:00Z,2026-08-18T11:40:00Z
+CUST-0111,Sadia Rehman,Loop Fitness,sadia@loopfitness.co,AI Consulting,7500,2026-09-10,Advice on adding an AI booking assistant,Umair Ashraf,umair@company.com,Standard,Proposal,2026-09-17,2026-08-23T09:15:00Z,2026-08-20T16:05:00Z
+CUST-0112,Imran Shah,Cascade Legal,imran@cascadelegal.pk,Consulting,32000,2026-09-15,Document intake workflow across two offices,Zainab Qureshi,zainab@company.com,Mid-Market,New Lead,2026-09-22,2026-08-24T08:30:00Z,2026-08-24T08:30:00Z

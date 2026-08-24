@@ -1,0 +1,6 @@
+Customer,Issue,Priority,Status,Created At
+Northwind,All workflows stopped after the platform outage,Critical,In Progress,2026-08-21T07:41:00Z
+Vertex Foods,Supplier sync failing intermittently,High,Open,2026-08-23T09:15:00Z
+Loop Fitness,Question about booking assistant hours,Low,Open,2026-08-23T16:40:00Z
+Bright Retail,Order notifications arriving twice,Medium,Resolved,2026-08-20T10:05:00Z
+Cascade Legal,Cannot access the shared workspace,Critical,Open,2026-08-23T13:22:00Z

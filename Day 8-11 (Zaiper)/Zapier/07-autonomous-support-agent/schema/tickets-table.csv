@@ -1,0 +1,5 @@
+Ticket ID,Customer,Issue,Category,Priority,Action,Status
+TKT-0238,Umair Ashraf,Charged twice for subscription in August,Billing,High,Finance ticket created - duplicate payment review,Open
+TKT-0239,Zara Malik,All workflows stopped running after the platform outage,Technical,Critical,Technical support ticket created + escalated to human,In Progress
+TKT-0240,Daniyal Sheikh,Card declined and account moved to past due,Billing,High,Finance ticket created - payment method review,Resolved
+TKT-0241,Mehwish Iqbal,Third contact with no response - customer angry,General,Critical,Escalated to human,Open

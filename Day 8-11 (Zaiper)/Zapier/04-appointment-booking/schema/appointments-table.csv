@@ -1,0 +1,5 @@
+Appointment ID,Patient,Phone,Doctor,Date,Time,Reason,Status,Slot Key
+APT-0055,Ayesha Siddiqui,+92-300-1112233,Dr. Ahmed,2026-08-25,09:00,Annual general checkup,Confirmed,Dr. Ahmed|2026-08-25|09:00
+APT-0056,Kamran Butt,+92-321-4445566,Dr. Ali,2026-08-25,16:00,Follow up on blood pressure medication,Confirmed,Dr. Ali|2026-08-25|16:00
+APT-0057,Nida Farooq,+92-333-7778899,Dr. Sara,2026-08-26,11:00,Recurring eczema on hands,Confirmed,Dr. Sara|2026-08-26|11:00
+APT-0058,Hira Nadeem,+92-300-1234567,Dr. Sara,2026-08-25,16:00,Rash on arm that is not clearing up,Confirmed,Dr. Sara|2026-08-25|16:00

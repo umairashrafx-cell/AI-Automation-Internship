@@ -1,0 +1,23 @@
+{
+  "table": "Leads",
+  "description": "Every lead submitted through the Sales Lead Intake interface form.",
+  "defaultStatus": "New",
+  "columns": [
+    { "name": "Lead ID",     "type": "text",      "unique": true, "source": "Code step: lead-id-generator.js -> leadId", "example": "LEAD-2026-001" },
+    { "name": "Name",        "type": "text",      "required": true, "source": "Form: Full Name" },
+    { "name": "Email",       "type": "email",     "required": true, "source": "Form: Email" },
+    { "name": "Phone",       "type": "text",      "required": true, "source": "Form: Phone" },
+    { "name": "Company",     "type": "text",      "required": true, "source": "Form: Company" },
+    { "name": "Industry",    "type": "text",      "required": true, "source": "Form: Industry" },
+    { "name": "Budget",      "type": "number",    "required": true, "source": "Form: Budget", "notes": "Store the raw number; currency formatting happens in emails only." },
+    { "name": "Lead Source", "type": "dropdown",  "options": ["Website", "LinkedIn", "Instagram", "Referral", "Advertisement"], "source": "Form: Lead Source" },
+    { "name": "Requirement", "type": "long_text", "source": "Form: Requirement" },
+    { "name": "Urgency",     "type": "dropdown",  "options": ["Low", "Medium", "High"], "source": "Form: Urgency" },
+    { "name": "Lead Score",  "type": "number",    "source": "Code step: lead-scoring.js -> leadScore", "range": "0-80" },
+    { "name": "Status",      "type": "dropdown",  "options": ["New", "Contacted", "Qualified", "Lost"], "default": "New" },
+    { "name": "Created At",  "type": "datetime",  "source": "Code step: lead-id-generator.js -> createdAt" }
+  ],
+  "optionalColumns": [
+    { "name": "Priority", "type": "dropdown", "options": ["Hot", "Warm", "Cold"], "source": "Code step: lead-scoring.js -> priority", "notes": "Derived from Lead Score. Add it if you want Hot/Warm/Cold visible without doing the banding in your head." }
+  ]
+}
