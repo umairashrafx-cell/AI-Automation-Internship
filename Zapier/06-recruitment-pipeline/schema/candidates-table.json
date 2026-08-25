@@ -1,0 +1,32 @@
+{
+  "table": "Candidates",
+  "description": "Developer applications. The Stage column drives the recruitment Kanban board.",
+  "kanban": {
+    "groupBy": "Stage",
+    "stages": ["Applied", "Screening", "Technical Interview", "HR Interview", "Offer", "Hired", "Rejected"],
+    "terminalStages": ["Hired", "Rejected"],
+    "note": "Rejected is reachable from any stage - the stage router checks it first so the rejection email fires wherever the card came from."
+  },
+  "columns": [
+    { "name": "Candidate ID",     "type": "text",     "unique": true, "source": "Code step: candidate-priority.js -> candidateId" },
+    { "name": "Candidate Name",   "type": "text",     "source": "Form: Candidate Name" },
+    { "name": "Email",            "type": "email",    "source": "Form: Email" },
+    { "name": "Phone",            "type": "text",     "source": "Form: Phone" },
+    { "name": "Position",         "type": "dropdown", "options": ["Frontend Developer", "Backend Developer", "Full Stack Developer", "Mobile Developer", "AI/Automation Engineer"] },
+    { "name": "Experience",       "type": "text",     "source": "Form: Experience", "notes": "Raw text as typed - kept for audit." },
+    { "name": "Years Experience", "type": "number",   "source": "Code step: candidate-priority.js -> yearsExperience", "notes": "Parsed value the priority rule uses." },
+    { "name": "Expected Salary",  "type": "number",   "source": "Form: Expected Salary" },
+    { "name": "Resume",           "type": "file",     "required": true, "source": "Form: Resume" },
+    { "name": "Portfolio",        "type": "url",      "required": false, "source": "Form: Portfolio" },
+    { "name": "Availability",     "type": "dropdown", "options": ["Immediate", "2 weeks", "1 month", "2 months", "Negotiable"] },
+    { "name": "Priority",         "type": "dropdown", "options": ["High", "Medium", "Low"], "source": "Code step: candidate-priority.js -> priority" },
+    { "name": "Stage",            "type": "dropdown", "options": ["Applied", "Screening", "Technical Interview", "HR Interview", "Offer", "Hired", "Rejected"], "default": "Applied" },
+    { "name": "Last Update At",   "type": "datetime", "source": "Zap 2 step 3", "notes": "REQUIRED for the 5-day stale-candidate sweep." },
+    { "name": "Applied At",       "type": "datetime", "source": "Code step: candidate-priority.js -> appliedAt" }
+  ],
+  "priorityRules": {
+    "High":   "5+ years",
+    "Medium": "2-4 years",
+    "Low":    "less than 2 years"
+  }
+}

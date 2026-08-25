@@ -1,0 +1,45 @@
+{
+  "tables": [
+    {
+      "table": "Sales",
+      "columns": [
+        { "name": "Customer",      "type": "text" },
+        { "name": "Deal",          "type": "text" },
+        { "name": "Amount",        "type": "number" },
+        { "name": "Stage",         "type": "dropdown", "options": ["Discovery", "Qualified", "Proposal", "Negotiation", "Closed Won", "Closed Lost"] },
+        { "name": "Owner",         "type": "text" },
+        { "name": "Last Activity", "type": "datetime", "addedBeyondSpec": true, "why": "The stale-deal check has nothing to measure without it." }
+      ]
+    },
+    {
+      "table": "Tasks",
+      "columns": [
+        { "name": "Task",     "type": "text" },
+        { "name": "Owner",    "type": "text" },
+        { "name": "Deadline", "type": "date" },
+        { "name": "Status",   "type": "dropdown", "options": ["Not Started", "In Progress", "Blocked", "Done", "Cancelled"] }
+      ]
+    },
+    {
+      "table": "Support",
+      "columns": [
+        { "name": "Customer",   "type": "text" },
+        { "name": "Issue",      "type": "long_text" },
+        { "name": "Priority",   "type": "dropdown", "options": ["Critical", "High", "Medium", "Low"] },
+        { "name": "Status",     "type": "dropdown", "options": ["Open", "In Progress", "Resolved", "Closed"] },
+        { "name": "Created At", "type": "datetime", "addedBeyondSpec": true, "why": "The unresolved-critical SLA check needs an age." }
+      ]
+    }
+  ],
+  "thresholds": {
+    "staleDealDays": 5,
+    "highValueAmount": 10000,
+    "taskOverloadCount": 5,
+    "criticalTicketHours": 24
+  },
+  "safeActions": {
+    "allowed": ["create_task", "update_task_owner", "flag_record", "add_note"],
+    "forbidden": ["delete", "remove_record", "send_email", "send_sms", "email_customer", "post_", "update_amount", "update_deal_value", "refund", "discount", "invoice", "close_deal"],
+    "default": "DENY - an action not on the allowlist is blocked and recommended to a human, never permitted by omission."
+  }
+}

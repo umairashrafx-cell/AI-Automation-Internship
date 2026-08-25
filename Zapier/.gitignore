@@ -1,0 +1,23 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Node (only if you ever run the code files locally for testing)
+node_modules/
+package-lock.json
+
+# Secrets — never commit Zapier / OpenAI / app credentials
+.env
+.env.*
+*.key
+credentials.json
+secrets.json
+
+# Local exports that may contain account IDs or tokens
+*-export-private.json

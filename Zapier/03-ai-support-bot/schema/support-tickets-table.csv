@@ -1,0 +1,5 @@
+Ticket ID,Customer,Email,Issue,Priority,Status,Created At
+TKT-0229,Zara Malik,zara@northwind.io,The system is completely down and none of our workflows are running,Critical,Open,2026-08-24T07:41:00Z
+TKT-0230,Daniyal Sheikh,daniyal@pixelforge.co,I cant access my account after changing my password,High,Open,2026-08-24T08:55:00Z
+TKT-0231,Mehwish Iqbal,mehwish@tandemlabs.com,My Slack integration shows as disconnected and wont reconnect,Medium,In Progress,2026-08-24T09:30:00Z
+TKT-0232,Umair Ashraf,umair.ashrafx@gmail.com,Wanted to know more about the Business plan integrations,Low,Open,2026-08-24T10:12:00Z

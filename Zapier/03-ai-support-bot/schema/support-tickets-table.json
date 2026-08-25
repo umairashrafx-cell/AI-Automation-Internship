@@ -1,0 +1,19 @@
+{
+  "table": "Support Tickets",
+  "description": "Support requests collected by the CloudFlow chatbot when it cannot resolve an issue itself.",
+  "columns": [
+    { "name": "Ticket ID",  "type": "text",      "unique": true, "source": "Code step: priority-detection.js -> ticketId", "example": "TKT-0232" },
+    { "name": "Customer",   "type": "text",      "source": "Chatbot collected field: name" },
+    { "name": "Email",      "type": "email",     "source": "Chatbot collected field: email" },
+    { "name": "Issue",      "type": "long_text", "source": "Chatbot collected field: problem" },
+    { "name": "Priority",   "type": "dropdown",  "options": ["Critical", "High", "Medium", "Low"], "source": "Code step: priority-detection.js -> priority" },
+    { "name": "Status",     "type": "dropdown",  "options": ["Open", "In Progress", "Resolved", "Closed"], "default": "Open" },
+    { "name": "Created At", "type": "datetime",  "source": "Code step: priority-detection.js -> createdAt" }
+  ],
+  "priorityRules": {
+    "Critical": "System completely down, total outage, data loss",
+    "High":     "Cannot access account, locked out, billing error on the account",
+    "Medium":   "A normal question - a feature not working, an error, something slow",
+    "Low":      "A general request or enquiry with no fault reported"
+  }
+}

@@ -1,0 +1,5 @@
+Request ID,Employee,Department,Type,Amount,Description,Receipt,Manager,Approval Status,Risk Level,Submitted At
+EXP-0042,Ayesha Siddiqui,Marketing,Food,45.00,Team lunch after the Q3 campaign launch,https://files.zapier.com/receipt-0042.jpg,manager.marketing@company.com,Approved,Low,2026-08-20T12:31:00Z
+EXP-0043,Usman Tariq,Engineering,Equipment,320.00,Mechanical keyboard and monitor arm,https://files.zapier.com/receipt-0043.pdf,manager.eng@company.com,Pending Manager Approval,Medium,2026-08-21T09:05:00Z
+EXP-0044,Fatima Zubair,Sales,Travel,1250.00,Client visit to Karachi - flights and hotel,https://files.zapier.com/receipt-0044.pdf,manager.sales@company.com,Pending Manager + Finance Approval,High,2026-08-22T16:48:00Z
+EXP-0045,Umair Ashraf,Engineering,Software,750.00,Annual JetBrains All Products Pack license,,manager.eng@company.com,Receipt Required,High,2026-08-24T08:12:00Z

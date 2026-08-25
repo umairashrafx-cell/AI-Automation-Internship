@@ -1,0 +1,46 @@
+{
+  "tables": [
+    {
+      "table": "Content Ideas",
+      "description": "The pool the agent draws from. Status keeps used ideas out of rotation.",
+      "columns": [
+        { "name": "Topic",           "type": "text" },
+        { "name": "Product",         "type": "dropdown", "options": ["AI Course", "Done-For-You Automation"] },
+        { "name": "Target Audience", "type": "text" },
+        { "name": "Content Type",    "type": "dropdown", "options": ["Educational", "Case Study", "Behind the Scenes", "Myth Buster", "Quick Tip", "Story", "Comparison", "Question/Poll"] },
+        { "name": "Goal",            "type": "dropdown", "options": ["Leads", "Awareness", "Trust", "Engagement"] },
+        { "name": "Status",          "type": "dropdown", "options": ["Not Used", "Used", "Retired"], "default": "Not Used" }
+      ]
+    },
+    {
+      "table": "Instagram Content Calendar",
+      "description": "Approved posts. Written BEFORE any publishing decision - this is the audit trail and the human approval gate.",
+      "columns": [
+        { "name": "Date",           "type": "date" },
+        { "name": "Topic",          "type": "text" },
+        { "name": "Caption",        "type": "long_text" },
+        { "name": "Hook",           "type": "text" },
+        { "name": "CTA",            "type": "text" },
+        { "name": "Hashtags",       "type": "text" },
+        { "name": "Visual Concept", "type": "long_text" },
+        { "name": "Score",          "type": "number", "range": "0-10", "source": "Code step: quality-gate.js -> score" },
+        { "name": "Status",         "type": "dropdown", "options": ["Awaiting Approval", "Needs Human Rewrite", "Approved", "Published", "Rejected"], "default": "Awaiting Approval" }
+      ]
+    }
+  ],
+  "qualityGate": {
+    "passThreshold": 7,
+    "maxAttempts": 2,
+    "criteria": ["hook strength", "repetition", "CTA clarity", "audience relevance", "unsupported claims"],
+    "caps": {
+      "invented_claim": "total capped at 4",
+      "repetitive": "total capped at 6"
+    },
+    "failClosed": "An unparseable critique scores 0 and does not pass. Never publish what was not reviewed."
+  },
+  "repetitionRule": {
+    "window": 5,
+    "triggerCount": 3,
+    "effect": "Any content type appearing 3+ times in the last 5 posts (or 3 in a row) is added to bannedContentTypes and cannot be chosen. The critic independently caps a repetitive post at 6."
+  }
+}

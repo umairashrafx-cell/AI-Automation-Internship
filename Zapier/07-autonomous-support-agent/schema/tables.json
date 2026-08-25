@@ -1,0 +1,36 @@
+{
+  "tables": [
+    {
+      "table": "Customers",
+      "description": "Customer records the agent reads before answering anything about an account.",
+      "columns": [
+        { "name": "Customer ID",         "type": "text",     "unique": true },
+        { "name": "Name",                "type": "text" },
+        { "name": "Email",               "type": "email",    "notes": "The agent's Search Customer tool looks up on this column." },
+        { "name": "Plan",                "type": "dropdown", "options": ["Starter", "Professional", "Business"] },
+        { "name": "Subscription Status", "type": "dropdown", "options": ["Active", "Past Due", "Cancelled", "Trial"] }
+      ]
+    },
+    {
+      "table": "Tickets",
+      "description": "Tickets the agent creates or updates. The Action column records the decision the agent made, not just the request.",
+      "columns": [
+        { "name": "Ticket ID", "type": "text",      "unique": true, "source": "Code step: duplicate-ticket-check.js -> newTicketId" },
+        { "name": "Customer",  "type": "text",      "source": "Search Customer -> Name" },
+        { "name": "Issue",     "type": "long_text", "source": "The customer's message; follow-ups are appended by the update path." },
+        { "name": "Category",  "type": "dropdown",  "options": ["Account", "Billing", "Technical", "General"], "source": "Code step: intent-severity-router.js -> category", "notes": "Category + Open status is what the duplicate check matches on." },
+        { "name": "Priority",  "type": "dropdown",  "options": ["Critical", "High", "Medium", "Low"], "source": "Code step: intent-severity-router.js -> severity" },
+        { "name": "Action",    "type": "text",      "source": "Code step: intent-severity-router.js -> action" },
+        { "name": "Status",    "type": "dropdown",  "options": ["Open", "In Progress", "Resolved", "Closed"], "default": "Open" }
+      ]
+    }
+  ],
+  "actionMapping": {
+    "Password Problem":  "Send password reset instructions",
+    "Billing Question":  "Search customer/order data",
+    "Duplicate Payment": "Create finance ticket",
+    "Technical Issue":   "Create technical support ticket",
+    "Angry Customer":    "Escalate to human"
+  },
+  "duplicateRule": "An OPEN ticket in the SAME category for the SAME customer means update, not create. Resolved and Closed tickets do not block a new one."
+}

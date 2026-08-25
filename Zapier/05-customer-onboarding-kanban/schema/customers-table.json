@@ -1,0 +1,26 @@
+{
+  "table": "Customers",
+  "description": "CRM-style onboarding records. This table IS the Kanban board - the Stage column is the grouping column.",
+  "kanban": {
+    "groupBy": "Stage",
+    "stages": ["New Lead", "Qualified", "Proposal", "Won", "Onboarding", "In Progress", "Completed"],
+    "note": "The Kanban board renders columns in the Stage dropdown's option order, so create the options in pipeline order."
+  },
+  "columns": [
+    { "name": "Customer ID",           "type": "text",      "unique": true, "source": "Code step: onboarding-setup.js -> customerId" },
+    { "name": "Client Name",           "type": "text",      "source": "Form: Client Name" },
+    { "name": "Company",               "type": "text",      "source": "Form: Company" },
+    { "name": "Email",                 "type": "email",     "source": "Form: Email" },
+    { "name": "Service",               "type": "dropdown",  "options": ["AI Automation", "Web Development", "Mobile App", "AI Consulting", "Consulting"] },
+    { "name": "Project Budget",        "type": "number",    "source": "Form: Project Budget" },
+    { "name": "Start Date",            "type": "date",      "source": "Form: Start Date" },
+    { "name": "Requirements",          "type": "long_text", "source": "Form: Requirements" },
+    { "name": "Account Manager",       "type": "text",      "source": "Code step: onboarding-setup.js -> accountManager", "notes": "Auto-assigned by service line; the form field can override." },
+    { "name": "Account Manager Email", "type": "email",     "source": "Code step: onboarding-setup.js -> accountManagerEmail" },
+    { "name": "Tier",                  "type": "dropdown",  "options": ["Enterprise", "Mid-Market", "Standard"], "rule": ">= 50000 Enterprise, >= 10000 Mid-Market, else Standard" },
+    { "name": "Stage",                 "type": "dropdown",  "options": ["New Lead", "Qualified", "Proposal", "Won", "Onboarding", "In Progress", "Completed"], "default": "New Lead" },
+    { "name": "Due Date",              "type": "date",      "source": "Code step: onboarding-setup.js -> dueDate", "rule": "Start Date + 7 days" },
+    { "name": "Stage Changed At",      "type": "datetime",  "source": "Zap 2 step 3", "notes": "REQUIRED for the stalled-card extra challenge. Without it the sweep measures record age, not time in stage." },
+    { "name": "Created At",            "type": "datetime",  "source": "Code step: onboarding-setup.js -> createdAt" }
+  ]
+}
