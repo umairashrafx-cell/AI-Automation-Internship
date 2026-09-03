@@ -1,0 +1,25 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "timestamp": 1788344992830,
+    "call": {
+      "id": "call_demo_003",
+      "type": "inboundPhoneCall",
+      "customer": {
+        "number": "+923214567890"
+      }
+    },
+    "toolCalls": [
+      {
+        "id": "toolu_vapi_003",
+        "type": "function",
+        "function": {
+          "name": "searchKnowledge",
+          "arguments": {
+            "query": "Can I return headphones after 10 days?"
+          }
+        }
+      }
+    ]
+  }
+}

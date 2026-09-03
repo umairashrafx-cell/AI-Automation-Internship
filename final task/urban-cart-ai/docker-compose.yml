@@ -1,0 +1,156 @@
+# =============================================================================
+# UrbanCart AI - production-shaped local stack
+# =============================================================================
+# This is OPTIONAL. The project runs with `npm start` and no Docker at all,
+# using an embedded PostgreSQL. Use this compose file when you want to exercise
+# the production topology locally: a real PostgreSQL server, a real pgvector
+# instance, and n8n as a separate service.
+#
+#   docker compose up -d
+#   docker compose logs -f app
+#
+# Then open http://localhost:3000 (chat) and http://localhost:5678 (n8n).
+#
+# Secrets come from your .env file. Nothing is hard-coded here.
+# =============================================================================
+
+name: urbancart-ai
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL - system of record AND (locally) the vector store.
+  # In production these are two separate databases; here one server hosts both
+  # schemas, which is why the image must include pgvector.
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: urbancart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-urbancart}
+      POSTGRES_USER: ${POSTGRES_USER:-urbancart}
+      # Required. Set POSTGRES_PASSWORD in .env - compose will refuse to start
+      # without it rather than silently using a default.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Both schemas are applied on first boot, in filename order.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/supabase-schema.sql:/docker-entrypoint-initdb.d/02-vector-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/03-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-urbancart} -d ${POSTGRES_DB:-urbancart}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # The UrbanCart backend + chat interface.
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: urbancart-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Use the real PostgreSQL server, not the embedded database.
+      DB_DRIVER: postgres
+      DATABASE_URL: postgresql://${POSTGRES_USER:-urbancart}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-urbancart}
+
+      # Vectors live in the same server locally; point VECTOR_STORE at supabase
+      # and supply SUPABASE_* to use the hosted store instead.
+      VECTOR_STORE: ${VECTOR_STORE:-pgvector}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+
+      # Everything below is optional. Anything left blank degrades to the
+      # documented fallback (local embeddings, extractive answers, dry-run
+      # integrations) - the stack still comes up and works.
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-extractive}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5}
+
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
+
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      AIRTABLE_API_KEY: ${AIRTABLE_API_KEY:-}
+      AIRTABLE_BASE_ID: ${AIRTABLE_BASE_ID:-}
+      NOTION_API_KEY: ${NOTION_API_KEY:-}
+      ZAPIER_CATCH_HOOK_URL: ${ZAPIER_CATCH_HOOK_URL:-}
+      ZAPIER_SHARED_SECRET: ${ZAPIER_SHARED_SECRET:-}
+      VAPI_WEBHOOK_SECRET: ${VAPI_WEBHOOK_SECRET:-}
+
+      GOOGLE_SERVICE_ACCOUNT_KEY_FILE: ${GOOGLE_SERVICE_ACCOUNT_KEY_FILE:-}
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # The knowledge base is read at ingestion time, so it can be updated
+      # without rebuilding the image.
+      - ./knowledge-base:/app/knowledge-base:ro
+      # The dry-run outbox stays visible on the host for inspection.
+      - ./data/outbox:/app/data/outbox
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # n8n - orchestration. Import n8n/workflows/*.json after first boot.
+  # ---------------------------------------------------------------------------
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: urbancart-n8n
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: Asia/Karachi
+      TZ: Asia/Karachi
+      # n8n nags about permissions on a bind mount otherwise.
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_RUNNERS_ENABLED: "true"
+
+      # These are the variables the workflows reference. `app` resolves on the
+      # compose network - not localhost, which inside the container would be n8n
+      # itself.
+      URBANCART_API_URL: http://app:3000
+      URBANCART_API_KEY: ${INTERNAL_API_KEY:-}
+      URBANCART_WEBHOOK_SIGNATURE: ${N8N_WEBHOOK_SIGNATURE:-}
+      GOOGLE_DRIVE_FOLDER_ID: ${GOOGLE_DRIVE_FOLDER_ID:-}
+      VAPI_WEBHOOK_SECRET: ${VAPI_WEBHOOK_SECRET:-}
+      SLACK_CHANNEL_ALERTS: ${SLACK_CHANNEL_ALERTS:-#urbancart-alerts}
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    volumes:
+      - n8n-data:/home/node/.n8n
+      # Workflow JSON is available inside the container for import.
+      - ./n8n/workflows:/workflows:ro
+
+volumes:
+  postgres-data:
+  n8n-data:

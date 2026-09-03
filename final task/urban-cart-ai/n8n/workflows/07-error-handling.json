@@ -1,0 +1,219 @@
+{
+  "name": "UrbanCart 7 - Centralised Error Handling",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "error-trigger-070",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -600,
+        300
+      ],
+      "notes": "Set this workflow as the \"Error Workflow\" in every other workflow's settings. n8n then routes any unhandled failure here.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// One consistent error shape regardless of which workflow failed.\nconst e = $input.first().json;\nconst workflowName = e.workflow?.name ?? 'unknown workflow';\nconst message = e.execution?.error?.message ?? e.error?.message ?? 'no message';\nconst stack = e.execution?.error?.stack ?? '';\nconst node = e.execution?.lastNodeExecuted ?? 'unknown node';\n\n// Classify so the alert says something more useful than \"it broke\".\nlet errorCode = 'N8N_EXECUTION_FAILED';\nconst lower = message.toLowerCase();\nif (lower.includes('timeout') || lower.includes('etimedout')) errorCode = 'UPSTREAM_TIMEOUT';\nelse if (lower.includes('econnrefused')) errorCode = 'BACKEND_UNREACHABLE';\nelse if (lower.includes('401') || lower.includes('unauthor')) errorCode = 'AUTH_FAILED';\nelse if (lower.includes('429')) errorCode = 'RATE_LIMITED';\nelse if (lower.includes('embedding')) errorCode = 'EMBEDDING_FAILED';\n\nreturn [{\n  json: {\n    workflow: workflowName,\n    node,\n    errorCode,\n    // Never surfaced to a customer - this goes to the alerts channel only.\n    errorMessage: (message + (stack ? ' | ' + stack.split('\\n')[0] : '')).slice(0, 1500),\n    executionId: e.execution?.id ?? null,\n    executionUrl: e.execution?.url ?? null,\n    failedAt: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "normalise-error-071",
+      "name": "Normalise Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: $json.workflow, errorCode: $json.errorCode, errorMessage: $json.errorMessage, subject: $json.node, execution: { id: $json.executionId } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-log-alert-072",
+      "name": "Backend: Log + Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -120,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "The backend writes workflow_executions and posts the single \"⚠️ Automation Failed\" Slack alert. Centralising it here means one format and no duplicate pages.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "backend-reachable-cond-073",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "backend-reachable-074",
+      "name": "Backend Reachable?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        140,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('Failure recorded and alerted:', JSON.stringify($json.body ?? {}));\nreturn [$input.first()];"
+      },
+      "id": "done-075",
+      "name": "Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $env.SLACK_CHANNEL_ALERTS }}",
+          "mode": "name"
+        },
+        "text": "=:rotating_light: *UrbanCart backend unreachable* — an n8n workflow failed AND the error webhook could not be delivered.\\n\\n*Workflow:* {{ $(\"Normalise Error\").item.json.workflow }}\\n*Node:* {{ $(\"Normalise Error\").item.json.node }}\\n*Error:* {{ $(\"Normalise Error\").item.json.errorMessage }}\\n\\nThe backend API is probably down. Check it first.",
+        "otherOptions": {}
+      },
+      "id": "slack-direct-alert-076",
+      "name": "Slack: Direct Alert (backend down)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        400
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_SLACK_CREDENTIAL_ID",
+          "name": "UrbanCart Slack"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Last resort. If the backend is down it cannot alert anyone about itself, so this path posts to Slack directly from n8n.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalise Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise Error": {
+      "main": [
+        [
+          {
+            "node": "Backend: Log + Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Log + Alert": {
+      "main": [
+        [
+          {
+            "node": "Backend Reachable?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend Reachable?": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: Direct Alert (backend down)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Set as the Error Workflow on all other UrbanCart workflows."
+  },
+  "tags": [
+    "urbancart",
+    "error-handling",
+    "operations"
+  ]
+}

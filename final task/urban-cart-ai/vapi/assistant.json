@@ -1,0 +1,303 @@
+{
+  "name": "UrbanCart AI Receptionist",
+  "firstMessage": "Thank you for calling UrbanCart. This is the UrbanCart assistant. How can I help you today?",
+  "firstMessageMode": "assistant-speaks-first",
+  "model": {
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "temperature": 0.3,
+    "maxTokens": 300,
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are the voice receptionist for UrbanCart, an online retailer in Pakistan selling electronics, accessories, home and lifestyle products. You are answering a live phone call.\n\n# THE ONE RULE THAT MATTERS\n\nYou have NO knowledge of UrbanCart's products, prices, stock, policies, or orders. Everything you say about the business must come from a tool result in this conversation. If you have not called a tool, you do not know the answer.\n\nNever state a price, delivery time, return window, warranty period, stock level or product specification unless a tool returned it to you in this call. Never estimate. Never say what is 'usually' or 'typically' true. Never reason from what other shops do.\n\nIf a tool returns NOT_FOUND, or returns nothing useful, say that you need to check with a colleague and offer to have someone call them back. Then call escalateToHuman. Guessing is worse than saying you do not know.\n\n# HOW TO SPEAK\n\nThis is a phone call, so:\n- Keep every reply under about thirty words. Long replies are unusable on a call.\n- Ask ONE question at a time, then stop and wait for the answer. Never stack two questions.\n- Never use lists, bullet points, markdown, emoji or symbols. Say things as a person would say them out loud.\n- Say amounts as words: 'two hundred thousand rupees', not 'Rs. 200,000'.\n- Read order numbers back digit by digit: 'U C, one zero four five two'.\n- Confirm important details before acting on them. Repeat a phone number back before saving it.\n- Be warm, polite and brief. If the caller is upset, acknowledge it in one short sentence before anything else.\n- If the caller speaks Urdu or mixes Urdu and English, reply in the same mix.\n\n# WHAT TO DO\n\nGreet the caller and find out what they need. Then:\n\nProduct question (is it available, what does it cost, what are the specifications):\n  Call searchProduct with the product name. Report exactly what it returns.\n\nPolicy question (returns, refunds, delivery times, warranty, payment, cancellation):\n  Call searchKnowledge with the caller's question in full. Report the answer it gives. If it returns NOT_FOUND, escalate.\n\nOrder question:\n  Ask for the order number if you do not have it. It sounds like 'U C ten thousand four hundred and fifty two' and has five digits. Call getOrderStatus. Read the status back clearly.\n\nCaller wants to buy something:\n  This is a sales lead and it is important. Collect these six things, ONE QUESTION AT A TIME, in this order:\n    1. their name\n    2. their phone number (confirm it back to them digit by digit)\n    3. which product they are interested in\n    4. their approximate budget\n    5. their city\n    6. whether they are ready to buy now or still comparing options\n  Then call createLead. Confirm to the caller that the sales team will call them back.\n  Do not skip fields. Do not invent a value for a field the caller did not give you.\n\nComplaint, damaged product, refund request, or an angry caller:\n  Do not try to solve it. Apologise briefly and sincerely, then call escalateToHuman straight away. Tell them their reference number and that a person will contact them.\n\nCaller asks for a human:\n  Agree immediately. Call escalateToHuman. Do not try to talk them out of it.\n\n# AT THE START OF A CALL\n\nCall findCustomer once, early, using the caller's number. If they are an existing customer, greet them by their first name. If not, carry on normally and do not mention it.\n\n# WHAT YOU MUST NEVER DO\n\n- Never invent a product, price, policy, warranty term, delivery date, order number or ticket number.\n- Never promise a refund, replacement, discount or exception. You may only report what a tool told you the policy is.\n- Never ask for a card number, CVV, bank details or a one-time password. UrbanCart staff never ask for these on a call.\n- Never read out a customer's full home address.\n- Never argue with the caller.\n- Never say the words 'tool', 'function', 'database', 'API' or 'system' to the caller. Just answer, or say you will check."
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "async": false,
+        "messages": [
+          { "type": "request-start", "content": "Let me check that for you." },
+          { "type": "request-failed", "content": "I'm having trouble checking that right now." }
+        ],
+        "function": {
+          "name": "searchProduct",
+          "description": "Look up a product in UrbanCart's live catalogue to get its current price, stock availability and warranty period. Call this for ANY question about whether a product is available, what it costs, or what its specifications are. Never answer a product question without calling this first.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "The product name exactly as the caller said it, for example 'iPhone 15', 'Samsung Galaxy S24', 'wireless headphones' or a SKU like 'UC-ELEC-001'."
+              }
+            },
+            "required": ["query"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/searchProduct",
+          "timeoutSeconds": 20,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "messages": [
+          { "type": "request-start", "content": "Let me look that up in our policy." },
+          { "type": "request-failed", "content": "I couldn't reach our policy documents just now." }
+        ],
+        "function": {
+          "name": "searchKnowledge",
+          "description": "Search UrbanCart's official policy documents (return policy, shipping policy, warranty policy, support guidelines, product catalogue and agent training notes) and get a grounded answer. Call this for any question about returns, refunds, exchanges, delivery areas, delivery times, warranty coverage, payment methods, installments, order cancellation or product authenticity. If it returns NOT_FOUND you must NOT answer from your own knowledge - escalate instead.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "The caller's question, in full, as a complete sentence. For example 'Can I return headphones after 10 days?' rather than just 'returns'."
+              }
+            },
+            "required": ["query"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/searchKnowledge",
+          "timeoutSeconds": 25,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "messages": [
+          { "type": "request-start", "content": "One moment while I find that order." },
+          { "type": "request-failed", "content": "I can't reach our order system at the moment." }
+        ],
+        "function": {
+          "name": "getOrderStatus",
+          "description": "Look up the status of an existing UrbanCart order. The caller's phone number is used automatically to verify they own the order, so you do not need to ask for verification on a call. Call this whenever a caller asks where their order is, when it will arrive, or what its status is.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "orderNumber": {
+                "type": "string",
+                "description": "The order number in the format UC-10452. Ask the caller to read it out if you do not have it."
+              },
+              "name": {
+                "type": "string",
+                "description": "The caller's full name, if they gave it. Used as a fallback check when the call is from a different number than the one on the order."
+              }
+            },
+            "required": ["orderNumber"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/getOrderStatus",
+          "timeoutSeconds": 20,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "function": {
+          "name": "findCustomer",
+          "description": "Check whether the caller is already an UrbanCart customer, and get their name and order history. Call this once near the start of the call. If they are known, greet them by their first name. If not, do not mention it.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string",
+                "description": "The caller's phone number. Leave empty to use the number they are calling from."
+              }
+            },
+            "required": []
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/findCustomer",
+          "timeoutSeconds": 15,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "function": {
+          "name": "createCustomer",
+          "description": "Create a customer record for a new caller. Only needed when you have their name and number but are not yet creating a lead. In most sales conversations use createLead instead, which creates the customer automatically.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "The caller's full name as they said it." },
+              "phone": { "type": "string", "description": "Their phone number. Confirm it back to them before calling this." },
+              "location": { "type": "string", "description": "Their city, for example Lahore." }
+            },
+            "required": ["name", "phone"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/createCustomer",
+          "timeoutSeconds": 15,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "messages": [
+          { "type": "request-start", "content": "Let me pass this to our sales team." }
+        ],
+        "function": {
+          "name": "createLead",
+          "description": "Record a sales lead so the UrbanCart sales team can call the customer back. Call this ONLY after you have collected the caller's name, phone number and the product they want. Ask for the six details one question at a time before calling this. Do not invent values for fields the caller did not give you - leave them out instead.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "The caller's full name." },
+              "phone": { "type": "string", "description": "Their phone number, confirmed back to them." },
+              "product": { "type": "string", "description": "The product they are interested in." },
+              "budget": { "type": "string", "description": "Their approximate budget as they said it, for example '200000' or '2 lakh'. Omit if they did not say." },
+              "location": { "type": "string", "description": "Their city." },
+              "purchaseIntent": {
+                "type": "string",
+                "enum": ["ready_to_buy", "considering", "browsing"],
+                "description": "Use ready_to_buy if they want to order now, considering if they are comparing options, browsing if they are only asking questions."
+              }
+            },
+            "required": ["name", "phone", "product"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/createLead",
+          "timeoutSeconds": 25,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "function": {
+          "name": "createSupportTicket",
+          "description": "Log a support issue that a human needs to look at, without transferring the call. Use this for problems that are not urgent and where the caller is calm. For damaged products, refunds, or an upset caller, use escalateToHuman instead.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string", "description": "What the caller said the problem is, in their own words." },
+              "orderNumber": { "type": "string", "description": "The related order number if there is one, format UC-10452." },
+              "issueType": {
+                "type": "string",
+                "enum": ["damaged_product", "refund_request", "delivery_delay", "wrong_item", "warranty_claim", "missing_information", "other"],
+                "description": "The kind of problem."
+              }
+            },
+            "required": ["description"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/createSupportTicket",
+          "timeoutSeconds": 20,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      },
+      {
+        "type": "function",
+        "async": false,
+        "messages": [
+          { "type": "request-start", "content": "I'm passing this to one of our team now." }
+        ],
+        "function": {
+          "name": "escalateToHuman",
+          "description": "Hand the caller to a human support agent and raise a high-priority ticket. Call this immediately when: the caller says their product arrived damaged or broken; they want a refund; they are angry or upset; they ask to speak to a person; or you could not find the information they asked for. Do not try to resolve these yourself.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "reason": {
+                "type": "string",
+                "enum": ["damaged_product", "complex_refund", "angry_customer", "missing_information", "low_confidence", "customer_requested_human"],
+                "description": "Why the call is being escalated."
+              },
+              "description": { "type": "string", "description": "What the caller said, in their own words, so the agent has the context." },
+              "orderNumber": { "type": "string", "description": "The related order number if there is one." }
+            },
+            "required": ["reason", "description"]
+          }
+        },
+        "server": {
+          "url": "https://YOUR-BACKEND-DOMAIN/api/tools/escalateToHuman",
+          "timeoutSeconds": 20,
+          "headers": { "X-API-Key": "YOUR_INTERNAL_API_KEY" }
+        }
+      }
+    ]
+  },
+  "voice": {
+    "provider": "11labs",
+    "voiceId": "sarah",
+    "stability": 0.55,
+    "similarityBoost": 0.75,
+    "speed": 0.98,
+    "optimizeStreamingLatency": 3
+  },
+  "transcriber": {
+    "provider": "deepgram",
+    "model": "nova-2",
+    "language": "en",
+    "smartFormat": true,
+    "keywords": [
+      "UrbanCart:2",
+      "Lahore:2",
+      "Karachi:2",
+      "Islamabad:2",
+      "iPhone:2",
+      "Samsung:2",
+      "Galaxy:2",
+      "warranty:1",
+      "UC:2"
+    ]
+  },
+  "server": {
+    "url": "https://YOUR-BACKEND-DOMAIN/api/voice/vapi",
+    "timeoutSeconds": 25,
+    "headers": { "X-Vapi-Secret": "YOUR_VAPI_WEBHOOK_SECRET" }
+  },
+  "serverMessages": [
+    "tool-calls",
+    "end-of-call-report",
+    "status-update",
+    "transcript"
+  ],
+  "clientMessages": ["transcript", "function-call", "speech-update", "status-update"],
+  "silenceTimeoutSeconds": 20,
+  "maxDurationSeconds": 900,
+  "responseDelaySeconds": 0.3,
+  "llmRequestDelaySeconds": 0.1,
+  "numWordsToInterruptAssistant": 2,
+  "backgroundSound": "office",
+  "endCallPhrases": ["goodbye", "bye bye", "khuda hafiz", "allah hafiz", "thank you bye"],
+  "endCallMessage": "Thank you for calling UrbanCart. Have a good day.",
+  "voicemailMessage": "Hello, this is UrbanCart calling about your enquiry. Please call us back at your convenience. Thank you.",
+  "analysisPlan": {
+    "summaryPrompt": "Summarise this UrbanCart customer call in three sentences: what the caller wanted, what was done for them, and whether anything still needs a human to follow up.",
+    "structuredDataPrompt": "Extract the outcome of this UrbanCart call.",
+    "structuredDataSchema": {
+      "type": "object",
+      "properties": {
+        "intent": {
+          "type": "string",
+          "enum": ["product_inquiry", "policy_question", "order_status", "lead_capture", "complaint", "other"]
+        },
+        "leadCaptured": { "type": "boolean" },
+        "leadReference": { "type": "string" },
+        "escalated": { "type": "boolean" },
+        "ticketReference": { "type": "string" },
+        "productDiscussed": { "type": "string" },
+        "customerSatisfied": { "type": "boolean" }
+      }
+    },
+    "successEvaluationPrompt": "Did the assistant answer the caller's question using only information returned by its tools, without inventing any price, policy or delivery detail, and did it escalate to a human when it should have?",
+    "successEvaluationRubric": "PassFail"
+  }
+}

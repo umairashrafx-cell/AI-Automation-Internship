@@ -1,0 +1,27 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "timestamp": 1788344992830,
+    "call": {
+      "id": "call_demo_005",
+      "type": "inboundPhoneCall",
+      "customer": {
+        "number": "+923214567890"
+      }
+    },
+    "toolCalls": [
+      {
+        "id": "toolu_vapi_005",
+        "type": "function",
+        "function": {
+          "name": "escalateToHuman",
+          "arguments": {
+            "reason": "damaged_product",
+            "description": "The headphones I received are cracked on one side and will not switch on.",
+            "orderNumber": "UC-10453"
+          }
+        }
+      }
+    ]
+  }
+}

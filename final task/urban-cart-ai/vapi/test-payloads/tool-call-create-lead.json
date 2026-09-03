@@ -1,0 +1,30 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "timestamp": 1788344992830,
+    "call": {
+      "id": "call_demo_004",
+      "type": "inboundPhoneCall",
+      "customer": {
+        "number": "+923451112233"
+      }
+    },
+    "toolCalls": [
+      {
+        "id": "toolu_vapi_004",
+        "type": "function",
+        "function": {
+          "name": "createLead",
+          "arguments": {
+            "name": "Ayesha Siddiqui",
+            "phone": "+923451112233",
+            "product": "Samsung Galaxy S24",
+            "budget": "220000",
+            "location": "Lahore",
+            "purchaseIntent": "ready_to_buy"
+          }
+        }
+      }
+    ]
+  }
+}

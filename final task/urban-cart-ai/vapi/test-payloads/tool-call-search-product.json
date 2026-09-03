@@ -1,0 +1,25 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "timestamp": 1788344992830,
+    "call": {
+      "id": "call_demo_002",
+      "type": "inboundPhoneCall",
+      "customer": {
+        "number": "+923339876543"
+      }
+    },
+    "toolCalls": [
+      {
+        "id": "toolu_vapi_002",
+        "type": "function",
+        "function": {
+          "name": "searchProduct",
+          "arguments": {
+            "query": "iPhone 15"
+          }
+        }
+      }
+    ]
+  }
+}

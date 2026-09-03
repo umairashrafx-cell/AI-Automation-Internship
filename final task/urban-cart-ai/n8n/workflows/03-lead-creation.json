@@ -1,0 +1,368 @@
+{
+  "name": "UrbanCart 3 - Lead Creation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urbancart/lead",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "lead-webhook-026",
+      "name": "Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ],
+      "notes": "Body: { name, phone, product, budget?, location?, purchaseIntent?, source }",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// The six fields the client asked to capture.\nconst body = $input.first().json.body ?? $input.first().json;\nconst errors = [];\n\nconst name = (body.name ?? '').toString().trim();\nconst product = (body.product ?? '').toString().trim();\nlet phone = (body.phone ?? '').toString().replace(/[^\\d+]/g, '');\n\nif (name.length < 2) errors.push('name is required');\nif (!product) errors.push('product is required');\n\n// Normalise Pakistani numbers to E.164 so the same customer is one record\n// whether they called, messaged on WhatsApp or filled in the web form.\nif (phone.startsWith('00')) phone = '+' + phone.slice(2);\nif (!phone.startsWith('+')) {\n  const digits = phone.replace(/\\D/g, '');\n  if (digits.length === 11 && digits.startsWith('0')) phone = '+92' + digits.slice(1);\n  else if (digits.length === 12 && digits.startsWith('92')) phone = '+' + digits;\n  else if (digits.length === 10) phone = '+92' + digits;\n}\nif (!/^\\+[1-9]\\d{7,14}$/.test(phone)) errors.push('a valid phone number is required');\n\n// Budget may arrive as \"Rs. 200,000\", \"2 lakh\" or 200000.\nlet budget = null;\nconst raw = (body.budget ?? '').toString().toLowerCase();\nif (raw) {\n  const lakh = raw.match(/([\\d.]+)\\s*(lakh|lac)/);\n  const k = raw.match(/([\\d.]+)\\s*k\\b/);\n  if (lakh) budget = Math.round(parseFloat(lakh[1]) * 100000);\n  else if (k) budget = Math.round(parseFloat(k[1]) * 1000);\n  else {\n    const n = raw.replace(/[^\\d.]/g, '');\n    if (n) budget = Math.round(parseFloat(n));\n  }\n}\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    name, phone, product, budget,\n    location: body.location ?? null,\n    purchaseIntent: ['ready_to_buy','considering','browsing'].includes(body.purchaseIntent)\n      ? body.purchaseIntent : 'considering',\n    source: body.source ?? 'web_chat',\n  },\n}];"
+      },
+      "id": "validate-lead-fields-027",
+      "name": "Validate Lead Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        300
+      ],
+      "notes": "Phone normalisation happens here AND in the backend - n8n gives a fast rejection, the backend is the authority.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "lead-valid-cond-028",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "lead-valid-029",
+      "name": "Lead Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/tools/createLead",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.name, phone: $json.phone, product: $json.product, budget: $json.budget, location: $json.location, purchaseIntent: $json.purchaseIntent, source: $json.source }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-create-lead-030",
+      "name": "Backend: Create Lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        140,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Backend performs: find-or-create customer, duplicate check, lead scoring, PostgreSQL write, Airtable mirror, Slack notification when high value, and the Zapier hand-off.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "lead-created-cond-031",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "lead-created-032",
+      "name": "Lead Created?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Surface what actually happened so the caller can tell the customer.\nconst body = $json.body ?? {};\nconst data = body.data ?? {};\nreturn [{\n  json: {\n    success: true,\n    leadReference: data.lead?.reference ?? null,\n    duplicate: data.duplicate === true,\n    leadScore: data.scoring?.score ?? null,\n    highValue: data.scoring?.isHighValue === true,\n    salesNotified: data.notifications?.slack?.sent === true,\n    salesNotificationDryRun: data.notifications?.slack?.dryRun === true,\n    airtableMirrored: data.notifications?.airtable?.sent === true,\n    zapierTriggered: data.notifications?.zapier?.sent === true,\n  },\n}];"
+      },
+      "id": "summarise-outcome-033",
+      "name": "Summarise Outcome",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-lead-result-034",
+      "name": "Respond: Lead Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 3 - Lead Creation\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-lead-failure-035",
+      "name": "Report Lead Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: \"Thanks - I've taken your details and our sales team will follow up with you shortly.\" }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-lead-fallback-036",
+      "name": "Respond: Lead Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, errors: $json.errors, message: \"I still need a few details before I can pass this to our sales team.\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-missing-fields-037",
+      "name": "Respond: Missing Fields",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        140,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Lead Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Valid?": {
+      "main": [
+        [
+          {
+            "node": "Backend: Create Lead",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Missing Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Create Lead": {
+      "main": [
+        [
+          {
+            "node": "Lead Created?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Created?": {
+      "main": [
+        [
+          {
+            "node": "Summarise Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Lead Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise Outcome": {
+      "main": [
+        [
+          {
+            "node": "Respond: Lead Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Lead Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Lead Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Lead capture with de-duplication, scoring and selective Slack notification."
+  },
+  "tags": [
+    "urbancart",
+    "sales",
+    "lead"
+  ]
+}

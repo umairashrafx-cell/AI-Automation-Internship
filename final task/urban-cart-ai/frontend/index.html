@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UrbanCart AI Assistant</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #4f8cff;
+    --accent-soft: #1b2c4d;
+    --green: #3fb950;
+    --amber: #d29922;
+    --red: #f85149;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6fa; --panel: #ffffff; --panel-2: #f0f3f8; --border: #d9dee8;
+      --text: #12161d; --muted: #5b6577; --accent: #2563eb; --accent-soft: #e6efff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--panel);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .status { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pill {
+    font-size: 11px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--muted); white-space: nowrap;
+  }
+  .pill.ok { color: var(--green); border-color: color-mix(in srgb, var(--green) 40%, var(--border)); }
+  .pill.warn { color: var(--amber); border-color: color-mix(in srgb, var(--amber) 40%, var(--border)); }
+
+  main { flex: 1; display: grid; grid-template-columns: minmax(0,1fr) 340px; min-height: 0; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } aside { display: none; } }
+
+  #chat { display: flex; flex-direction: column; min-height: 0; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+
+  .msg { max-width: 78%; padding: 11px 14px; border-radius: var(--radius); white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+  .msg.bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 3px; }
+  .msg.bot.escalated { border-color: color-mix(in srgb, var(--amber) 50%, var(--border)); }
+  .msg .meta { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .typing { align-self: flex-start; color: var(--muted); font-size: 13px; font-style: italic; }
+
+  #composer { border-top: 1px solid var(--border); padding: 12px 16px; background: var(--panel); }
+  .row { display: flex; gap: 10px; }
+  input[type=text] {
+    flex: 1; padding: 11px 14px; border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 15px; font-family: inherit;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button {
+    padding: 11px 18px; border-radius: var(--radius); border: none; background: var(--accent);
+    color: #fff; font-weight: 600; cursor: pointer; font-size: 15px; font-family: inherit;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .examples { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .examples button {
+    background: var(--panel-2); color: var(--muted); border: 1px solid var(--border);
+    font-size: 12px; padding: 5px 10px; font-weight: 500;
+  }
+  .examples button:hover { color: var(--text); border-color: var(--accent); }
+
+  aside { border-left: 1px solid var(--border); background: var(--panel); overflow-y: auto; padding: 16px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  aside section { margin-bottom: 22px; }
+  .action { font-size: 12px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 7px; }
+  .action .t { color: var(--accent); font-weight: 600; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+  .action .r { float: right; color: var(--muted); font-family: ui-monospace, monospace; }
+  .source { font-size: 12px; padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--panel-2); margin-bottom: 7px; border-radius: 0 6px 6px 0; }
+  .source .f { font-weight: 600; }
+  .source .s { color: var(--muted); }
+  .empty { color: var(--muted); font-size: 12px; font-style: italic; }
+  .bar { height: 5px; background: var(--panel-2); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+  .bar > i { display: block; height: 100%; background: var(--green); }
+  .bar.low > i { background: var(--red); }
+  .bar.mid > i { background: var(--amber); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>UrbanCart AI Assistant</h1>
+    <div class="sub">24/7 support &middot; grounded in UrbanCart's own documents</div>
+  </div>
+  <div class="status" id="status"><span class="pill">connecting…</span></div>
+</header>
+
+<main>
+  <div id="chat">
+    <div id="messages"></div>
+    <div id="composer">
+      <div class="row">
+        <input id="input" type="text" placeholder="Ask about a product, an order, delivery, returns or warranty…" autocomplete="off" />
+        <button id="send">Send</button>
+      </div>
+      <div class="examples" id="examples"></div>
+    </div>
+  </div>
+
+  <aside>
+    <section>
+      <h2>Grounding</h2>
+      <div id="confidence" class="empty">No answer yet.</div>
+    </section>
+    <section>
+      <h2>What the system did</h2>
+      <div id="actions"><div class="empty">Actions taken by the assistant appear here.</div></div>
+    </section>
+    <section>
+      <h2>Sources retrieved</h2>
+      <div id="sources"><div class="empty">Documents used to ground the answer appear here.</div></div>
+    </section>
+  </aside>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const messagesEl = document.getElementById('messages');
+  const inputEl    = document.getElementById('input');
+  const sendEl     = document.getElementById('send');
+  const actionsEl  = document.getElementById('actions');
+  const sourcesEl  = document.getElementById('sources');
+  const confEl     = document.getElementById('confidence');
+  const statusEl   = document.getElementById('status');
+  const examplesEl = document.getElementById('examples');
+
+  // One session per browser tab, so a reload continues the same conversation.
+  const sessionId = sessionStorage.getItem('uc_session') ||
+    'web-' + Math.random().toString(36).slice(2, 11);
+  sessionStorage.setItem('uc_session', sessionId);
+
+  const EXAMPLES = [
+    'Is iPhone 15 available?',
+    'What is the price of Samsung Galaxy S24?',
+    'Do you deliver to Lahore?',
+    'Can I return headphones after 10 days?',
+    'Does the iPhone 15 have a warranty?',
+    'My order UC-10452 hasn’t arrived yet',
+    'I want to buy iPhone 15. My budget is Rs. 200,000. I am in Lahore. My name is Ahmed Raza and my number is 0300 1234567.',
+    'My product arrived damaged',
+  ];
+
+  // textContent everywhere - never innerHTML with server or user text.
+  function el(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function addMessage(role, text, meta) {
+    const node = el('div', 'msg ' + role);
+    node.appendChild(document.createTextNode(text));
+    if (meta) {
+      if (meta.escalated) node.classList.add('escalated');
+      const m = el('div', 'meta');
+      m.appendChild(el('span', null, 'intent: ' + meta.intent));
+      m.appendChild(el('span', null, 'confidence: ' + Math.round(meta.confidence * 100) + '%'));
+      if (meta.requiresHuman) m.appendChild(el('span', null, '⚠ handed to a human'));
+      node.appendChild(m);
+    }
+    messagesEl.appendChild(node);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return node;
+  }
+
+  function renderPanels(data) {
+    // Confidence
+    confEl.className = '';
+    confEl.textContent = '';
+    const pct = Math.round(data.confidence * 100);
+    confEl.appendChild(el('div', null,
+      data.escalated
+        ? 'Declined to answer — handed to a human agent.'
+        : 'Grounding confidence: ' + pct + '%'));
+    const bar = el('div', 'bar' + (pct < 35 ? ' low' : pct < 60 ? ' mid' : ''));
+    const fill = el('i');
+    fill.style.width = Math.max(3, pct) + '%';
+    bar.appendChild(fill);
+    confEl.appendChild(bar);
+
+    // Actions
+    actionsEl.textContent = '';
+    if (!data.actions || data.actions.length === 0) {
+      actionsEl.appendChild(el('div', 'empty', 'No back-end actions were needed.'));
+    } else {
+      data.actions.forEach((a) => {
+        const row = el('div', 'action');
+        const t = el('span', 't', a.type);
+        row.appendChild(t);
+        if (a.reference) row.appendChild(el('span', 'r', a.reference));
+        row.appendChild(el('div', null, a.detail));
+        actionsEl.appendChild(row);
+      });
+    }
+
+    // Sources
+    sourcesEl.textContent = '';
+    if (!data.sources || data.sources.length === 0) {
+      sourcesEl.appendChild(el('div', 'empty',
+        'Answered from the database, not from documents.'));
+    } else {
+      data.sources.forEach((s) => {
+        const row = el('div', 'source');
+        row.appendChild(el('div', 'f', s.filename));
+        row.appendChild(el('div', 's',
+          (s.section ? s.section + ' · ' : '') +
+          'v' + s.version + ' · similarity ' + s.similarity));
+        sourcesEl.appendChild(row);
+      });
+    }
+  }
+
+  async function send(text) {
+    const message = (text !== undefined ? text : inputEl.value).trim();
+    if (!message) return;
+
+    addMessage('user', message);
+    inputEl.value = '';
+    sendEl.disabled = true;
+
+    const typing = el('div', 'typing', 'Assistant is thinking…');
+    messagesEl.appendChild(typing);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, sessionId, channel: 'web_chat' }),
+      });
+      const json = await res.json();
+      typing.remove();
+
+      if (!json.success) {
+        addMessage('bot', json.error ? json.error.message : 'Something went wrong.');
+        return;
+      }
+      addMessage('bot', json.data.reply, json.data);
+      renderPanels(json.data);
+    } catch (err) {
+      typing.remove();
+      addMessage('bot',
+        'I could not reach the assistant. Please check that the server is running.');
+    } finally {
+      sendEl.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  async function loadStatus() {
+    try {
+      const res = await fetch('/health');
+      const h = await res.json();
+      statusEl.textContent = '';
+      const add = (text, cls) => statusEl.appendChild(el('span', 'pill ' + (cls || ''), text));
+      add(h.status, h.status === 'ok' ? 'ok' : 'warn');
+      add('db: ' + h.checks.database.driver, 'ok');
+      add('vectors: ' + h.checks.vectorStore.kind, 'ok');
+      add('embeddings: ' + h.checks.embeddings.provider,
+          h.checks.embeddings.semantic ? 'ok' : 'warn');
+      add('answers: ' + h.checks.llm.provider,
+          h.checks.llm.provider === 'extractive' ? 'warn' : 'ok');
+    } catch (err) {
+      statusEl.textContent = '';
+      statusEl.appendChild(el('span', 'pill warn', 'server unreachable'));
+    }
+  }
+
+  EXAMPLES.forEach((text) => {
+    const b = el('button', null, text.length > 42 ? text.slice(0, 40) + '…' : text);
+    b.title = text;
+    b.addEventListener('click', () => send(text));
+    examplesEl.appendChild(b);
+  });
+
+  sendEl.addEventListener('click', () => send());
+  inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') send(); });
+
+  addMessage('bot',
+    "Hello! I'm UrbanCart's assistant. I can check product availability and prices, look up an order, or answer questions about delivery, returns and warranty. How can I help?");
+  loadStatus();
+  inputEl.focus();
+})();
+</script>
+</body>
+</html>

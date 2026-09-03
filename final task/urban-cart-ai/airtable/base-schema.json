@@ -1,0 +1,171 @@
+{
+  "baseName": "UrbanCart Operations",
+  "description": "Operational, business-facing mirror of the PostgreSQL system of record. Non-technical staff work here; nothing here is authoritative.",
+  "syncDirection": "PostgreSQL -> Airtable (one way)",
+  "tables": [
+    {
+      "name": "Leads",
+      "description": "Sales pipeline. One row per lead created by the AI on chat or voice.",
+      "primaryField": "Lead ID",
+      "fields": [
+        { "name": "Lead ID", "type": "singleLineText", "description": "LEAD-001. Matches leads.reference in PostgreSQL." },
+        { "name": "Name", "type": "singleLineText" },
+        { "name": "Phone", "type": "phoneNumber" },
+        { "name": "Product", "type": "singleLineText" },
+        { "name": "Budget", "type": "currency", "options": { "precision": 0, "symbol": "Rs. " } },
+        { "name": "Location", "type": "singleLineText" },
+        {
+          "name": "Purchase Intent",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "Ready to purchase", "color": "greenBright" },
+            { "name": "Considering", "color": "yellowBright" },
+            { "name": "Just asking", "color": "grayBright" }
+          ] }
+        },
+        {
+          "name": "Lead Source",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "web chat" }, { "name": "whatsapp" }, { "name": "instagram" },
+            { "name": "voice" }, { "name": "email" }, { "name": "manual" }
+          ] }
+        },
+        {
+          "name": "Status",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "New", "color": "blueBright" },
+            { "name": "Contacted", "color": "yellowBright" },
+            { "name": "Qualified", "color": "purpleBright" },
+            { "name": "Won", "color": "greenBright" },
+            { "name": "Lost", "color": "redBright" },
+            { "name": "Duplicate", "color": "grayBright" }
+          ] }
+        },
+        { "name": "Lead Score", "type": "number", "options": { "precision": 0 }, "description": "0-100, computed by lead.service.ts" },
+        { "name": "High Value", "type": "checkbox", "description": "TRUE means Slack #sales was notified." },
+        { "name": "Created At", "type": "dateTime" },
+        { "name": "Notes", "type": "multilineText" },
+        { "name": "Owner", "type": "singleLineText", "description": "Filled in by the sales team, not by the system." },
+        { "name": "Follow Up Date", "type": "date", "description": "Filled in by the sales team." }
+      ],
+      "views": [
+        { "name": "Hot Leads", "type": "grid", "filter": "High Value is checked AND Status is New", "sort": "Lead Score desc" },
+        { "name": "New This Week", "type": "grid", "filter": "Created At is within the past 7 days", "sort": "Created At desc" },
+        { "name": "By Owner", "type": "grid", "groupBy": "Owner" },
+        { "name": "Pipeline", "type": "kanban", "stackedBy": "Status" }
+      ]
+    },
+    {
+      "name": "Support Issues",
+      "description": "Every escalation the AI could not or should not handle.",
+      "primaryField": "Ticket ID",
+      "fields": [
+        { "name": "Ticket ID", "type": "singleLineText", "description": "SUP-001. Matches support_tickets.reference." },
+        { "name": "Customer", "type": "singleLineText" },
+        {
+          "name": "Issue",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "damaged product", "color": "redBright" },
+            { "name": "refund request", "color": "orangeBright" },
+            { "name": "delivery delay", "color": "yellowBright" },
+            { "name": "wrong item", "color": "orangeBright" },
+            { "name": "warranty claim", "color": "blueBright" },
+            { "name": "angry customer", "color": "redBright" },
+            { "name": "missing information", "color": "grayBright" },
+            { "name": "low confidence", "color": "grayBright" },
+            { "name": "other", "color": "grayBright" }
+          ] }
+        },
+        { "name": "Description", "type": "multilineText", "description": "The customer's own words." },
+        {
+          "name": "Priority",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "Urgent", "color": "redBright" },
+            { "name": "High", "color": "orangeBright" },
+            { "name": "Medium", "color": "yellowBright" },
+            { "name": "Low", "color": "grayBright" }
+          ] }
+        },
+        {
+          "name": "Status",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "open", "color": "redBright" },
+            { "name": "in progress", "color": "yellowBright" },
+            { "name": "waiting customer", "color": "blueBright" },
+            { "name": "resolved", "color": "greenBright" },
+            { "name": "closed", "color": "grayBright" }
+          ] }
+        },
+        {
+          "name": "Assigned Team",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "support" }, { "name": "sales" }, { "name": "operations" },
+            { "name": "logistics" }, { "name": "engineering" }
+          ] }
+        },
+        { "name": "Order Number", "type": "singleLineText" },
+        { "name": "Created At", "type": "dateTime" },
+        { "name": "Resolution", "type": "multilineText", "description": "Filled in by the agent." }
+      ],
+      "views": [
+        { "name": "Urgent Queue", "type": "grid", "filter": "Priority is Urgent or High AND Status is not resolved/closed", "sort": "Created At asc" },
+        { "name": "My Team", "type": "grid", "groupBy": "Assigned Team" },
+        { "name": "Damaged Products", "type": "grid", "filter": "Issue is damaged product" },
+        { "name": "Board", "type": "kanban", "stackedBy": "Status" }
+      ]
+    },
+    {
+      "name": "Orders",
+      "description": "Operations view of orders needing attention. Not a copy of every order.",
+      "primaryField": "Order Number",
+      "fields": [
+        { "name": "Order Number", "type": "singleLineText", "description": "UC-10452" },
+        { "name": "Customer", "type": "singleLineText" },
+        {
+          "name": "Status",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "pending" }, { "name": "confirmed" }, { "name": "processing" },
+            { "name": "shipped" }, { "name": "out for delivery" },
+            { "name": "delivered", "color": "greenBright" },
+            { "name": "delayed", "color": "redBright" },
+            { "name": "cancelled", "color": "grayBright" },
+            { "name": "returned", "color": "orangeBright" }
+          ] }
+        },
+        {
+          "name": "Delivery Status",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "In transit", "color": "blueBright" },
+            { "name": "Delivered", "color": "greenBright" },
+            { "name": "Overdue", "color": "redBright" }
+          ] }
+        },
+        {
+          "name": "Priority",
+          "type": "singleSelect",
+          "options": { "choices": [
+            { "name": "High", "color": "redBright" },
+            { "name": "Normal", "color": "grayBright" }
+          ] }
+        },
+        { "name": "Total Amount", "type": "currency", "options": { "precision": 0, "symbol": "Rs. " } },
+        { "name": "City", "type": "singleLineText" },
+        { "name": "Expected Delivery", "type": "date" },
+        { "name": "Action Taken", "type": "multilineText", "description": "Filled in by operations." }
+      ],
+      "views": [
+        { "name": "Needs Attention", "type": "grid", "filter": "Priority is High", "sort": "Expected Delivery asc" },
+        { "name": "Overdue", "type": "grid", "filter": "Delivery Status is Overdue" },
+        { "name": "By City", "type": "grid", "groupBy": "City" }
+      ]
+    }
+  ]
+}

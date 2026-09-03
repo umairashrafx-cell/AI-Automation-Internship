@@ -1,0 +1,344 @@
+{
+  "name": "UrbanCart 1 - Customer Chat Request",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urbancart/chat",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "chat-webhook-001",
+      "name": "Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        300
+      ],
+      "notes": "POST /webhook/urbancart/chat\nBody: { message, sessionId, channel, phone?, name? }",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and normalise before any expensive work happens.\nconst body = $input.first().json.body ?? $input.first().json;\nconst errors = [];\n\nconst message = typeof body.message === 'string' ? body.message.trim() : '';\nif (!message) errors.push('message is required');\nif (message.length > 4000) errors.push('message exceeds 4000 characters');\n\nconst sessionId = typeof body.sessionId === 'string' && body.sessionId.trim()\n  ? body.sessionId.trim()\n  : 'n8n-' + $execution.id;\n\nconst allowedChannels = ['web_chat', 'whatsapp', 'instagram', 'voice', 'email'];\nconst channel = allowedChannels.includes(body.channel) ? body.channel : 'web_chat';\n\nreturn [{\n  json: {\n    valid: errors.length === 0,\n    errors,\n    message,\n    sessionId,\n    channel,\n    phone: body.phone ?? null,\n    name: body.name ?? null,\n    correlationId: $execution.id,\n  },\n}];"
+      },
+      "id": "validate-input-002",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        300
+      ],
+      "notes": "Reject malformed input here so it never reaches the database.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "input-valid-cond-003",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "input-valid-004",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: $json.message, sessionId: $json.sessionId, channel: $json.channel, phone: $json.phone, name: $json.name }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-process-chat-turn-005",
+      "name": "Backend: Process Chat Turn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "The backend performs intent classification, customer lookup, RAG retrieval, grounded generation and escalation.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "backend-ok-cond-006",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "backend-ok-007",
+      "name": "Backend OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, reply: $json.body.data.reply, intent: $json.body.data.intent, confidence: $json.body.data.confidence, escalated: $json.body.data.escalated, requiresHuman: $json.body.data.requiresHuman, sources: $json.body.data.sources, conversationId: $json.body.data.conversationId }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-answer-008",
+      "name": "Respond: Answer",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        620,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 1 - Customer Chat Request\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-failure-009",
+      "name": "Report Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, reply: \"I'm sorry, I'm having trouble answering that right now. I've let our team know and a human agent will follow up with you shortly.\", requiresHuman: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-safe-fallback-010",
+      "name": "Respond: Safe Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, reply: \"I didn't quite catch that. Could you rephrase it for me?\", errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-validation-error-011",
+      "name": "Respond: Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        160,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Backend: Process Chat Turn",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Process Chat Turn": {
+      "main": [
+        [
+          {
+            "node": "Backend OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend OK?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Answer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Safe Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Entry point for website chat and WhatsApp. Always answers, even on failure."
+  },
+  "tags": [
+    "urbancart",
+    "chat",
+    "customer-facing"
+  ]
+}

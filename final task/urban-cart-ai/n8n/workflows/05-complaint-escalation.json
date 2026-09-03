@@ -1,0 +1,296 @@
+{
+  "name": "UrbanCart 5 - Complaint and Escalation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urbancart/escalate",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "escalation-webhook-050",
+      "name": "Escalation Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        300
+      ],
+      "notes": "Body: { description, phone?, orderNumber?, conversationId? }",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classify the complaint so the right team and priority are chosen.\nconst body = $input.first().json.body ?? $input.first().json;\nconst text = (body.description ?? body.message ?? '').toString();\nconst lower = text.toLowerCase();\n\nconst has = (terms) => terms.some((t) => lower.includes(t));\n\nconst damaged = has(['damaged','damage','broken','cracked','shattered','defective','faulty','not working']);\nconst refund  = has(['refund','money back','reimburse','compensation']);\nconst angry   = has(['angry','furious','ridiculous','unacceptable','worst','terrible','pathetic','useless','fed up','scam','fraud','third time','still waiting'])\n                || (text.length > 15 && text === text.toUpperCase());\nconst human   = has(['speak to a human','talk to a human','real person','human agent','manager','supervisor','representative']);\n\nlet reason = 'missing_information';\nif (damaged) reason = 'damaged_product';\nelse if (angry) reason = 'angry_customer';\nelse if (refund) reason = 'complex_refund';\nelse if (human) reason = 'customer_requested_human';\n\nconst orderMatch = text.match(/\\bUC[-\\s]?(\\d{5})\\b/i);\n\nreturn [{\n  json: {\n    reason,\n    description: text.slice(0, 2000),\n    phone: body.phone ?? null,\n    conversationId: body.conversationId ?? null,\n    orderNumber: body.orderNumber ?? (orderMatch ? 'UC-' + orderMatch[1] : null),\n    signals: { damaged, refund, angry, human },\n  },\n}];"
+      },
+      "id": "detect-escalation-reason-051",
+      "name": "Detect Escalation Reason",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/tools/escalateToHuman",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ reason: $json.reason, description: $json.description, phone: $json.phone, conversationId: $json.conversationId, orderNumber: $json.orderNumber }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-escalate-to-human-052",
+      "name": "Backend: Escalate To Human",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -80,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Backend creates the support ticket AND the task in one transaction, mirrors to Airtable, and posts the high-priority Slack alert.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "escalation-ok-cond-053",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "escalation-ok-054",
+      "name": "Escalation OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        180,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = ($json.body ?? {}).data ?? {};\nreturn [{\n  json: {\n    success: true,\n    ticket: data.ticket?.reference ?? null,\n    task: data.task?.reference ?? null,\n    priority: data.priority ?? null,\n    assignedTeam: data.ticket?.assignedTeam ?? null,\n    supportNotified: data.notified?.slack === true,\n    notificationDryRun: data.notified?.dryRun === true,\n    // The polite, non-technical message to show or speak to the customer.\n    customerMessage: data.customerMessage,\n  },\n}];"
+      },
+      "id": "shape-escalation-response-055",
+      "name": "Shape Escalation Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-escalated-056",
+      "name": "Respond: Escalated",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 5 - Complaint / Escalation\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-escalation-failure-057",
+      "name": "Report Escalation Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        400
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, customerMessage: \"I'm sorry about this. I've recorded your issue and a member of our support team will contact you shortly.\" }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-escalation-fallback-058",
+      "name": "Respond: Escalation Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Escalation Webhook": {
+      "main": [
+        [
+          {
+            "node": "Detect Escalation Reason",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Escalation Reason": {
+      "main": [
+        [
+          {
+            "node": "Backend: Escalate To Human",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Escalate To Human": {
+      "main": [
+        [
+          {
+            "node": "Escalation OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation OK?": {
+      "main": [
+        [
+          {
+            "node": "Shape Escalation Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Escalation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Escalation Response": {
+      "main": [
+        [
+          {
+            "node": "Respond: Escalated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Escalation Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Escalation Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Damaged goods, complex refunds, angry customers and explicit handoff requests."
+  },
+  "tags": [
+    "urbancart",
+    "support",
+    "escalation"
+  ]
+}

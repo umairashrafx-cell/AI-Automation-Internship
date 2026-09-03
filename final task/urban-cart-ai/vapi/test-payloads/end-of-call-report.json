@@ -1,0 +1,19 @@
+{
+  "message": {
+    "type": "end-of-call-report",
+    "endedReason": "customer-ended-call",
+    "call": {
+      "id": "call_demo_001",
+      "customer": {
+        "number": "+923001234567"
+      }
+    },
+    "artifact": {
+      "transcript": "AI: Thank you for calling UrbanCart..."
+    },
+    "analysis": {
+      "summary": "Customer asked about order UC-10452 which is delayed.",
+      "successEvaluation": "true"
+    }
+  }
+}

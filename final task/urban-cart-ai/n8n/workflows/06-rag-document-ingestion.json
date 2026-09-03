@@ -1,0 +1,374 @@
+{
+  "name": "UrbanCart 6 - RAG Document Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 15,
+              "unit": "minutes"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": "={{ $env.GOOGLE_DRIVE_FOLDER_ID }}",
+        "event": "fileUpdated",
+        "options": {}
+      },
+      "id": "drive-file-changed-059",
+      "name": "Drive: File Changed",
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -620,
+        220
+      ],
+      "notes": "Watches \"UrbanCart Knowledge Base\". Fires when a policy PDF, Word document or spreadsheet is added or updated. Business staff publish by dropping a file in a folder - no developer involvement.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "safety-net-every-6h-060",
+      "name": "Safety Net: Every 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -620,
+        420
+      ],
+      "notes": "Drive change notifications can be missed. A periodic full pass is cheap because ingestion is content-hashed: unchanged files are skipped and cost no embedding calls.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/knowledge/ingest",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: $env.GOOGLE_DRIVE_FOLDER_ID ? \"google_drive\" : \"local\", force: false }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-run-ingestion-061",
+      "name": "Backend: Run Ingestion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -320,
+        320
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Pipeline: detect changes -> download -> extract text (PDF/DOCX/XLSX) -> clean -> chunk -> embed -> store vectors in Supabase. Idempotent.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ingestion-ok-cond-062",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ingestion-ok-063",
+      "name": "Ingestion OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = ($json.body ?? {}).data ?? {};\nconst failed = (data.files ?? []).filter((f) => f.action === 'failed');\nreturn [{\n  json: {\n    processed: data.processed ?? 0,\n    created: data.created ?? 0,\n    updated: data.updated ?? 0,\n    skipped: data.skipped ?? 0,\n    failed: data.failed ?? 0,\n    totalChunks: data.totalChunks ?? 0,\n    failedFiles: failed.map((f) => ({ filename: f.filename, error: f.error })),\n    // Only a change or a failure is worth a human's attention.\n    worthReporting: (data.created ?? 0) + (data.updated ?? 0) + (data.failed ?? 0) > 0,\n    anyFailed: (data.failed ?? 0) > 0,\n  },\n}];"
+      },
+      "id": "summarise-ingestion-064",
+      "name": "Summarise Ingestion",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "any-document-failed-cond-065",
+              "leftValue": "={{ $json.anyFailed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "any-document-failed-066",
+      "name": "Any Document Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        400,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: 'RAG Document Ingestion', errorCode: 'DOCUMENT_PROCESSING_ERROR', subject: ($json.failedFiles[0] || {}).filename, errorMessage: ($json.failedFiles || []).map(f => f.filename + ': ' + f.error).join('; '), execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "alert-ingestion-failed-067",
+      "name": "Alert: Ingestion Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        160
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "Produces the \"⚠️ Automation Failed\" Slack alert naming the document.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "console.log('RAG ingestion complete', JSON.stringify($json));\nreturn [$input.first()];"
+      },
+      "id": "log-success-068",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 6 - RAG Document Ingestion\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-ingestion-failure-069",
+      "name": "Report Ingestion Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        460
+      ],
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Drive: File Changed": {
+      "main": [
+        [
+          {
+            "node": "Backend: Run Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Safety Net: Every 6h": {
+      "main": [
+        [
+          {
+            "node": "Backend: Run Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Run Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Ingestion OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingestion OK?": {
+      "main": [
+        [
+          {
+            "node": "Summarise Ingestion",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Ingestion Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise Ingestion": {
+      "main": [
+        [
+          {
+            "node": "Any Document Failed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Document Failed?": {
+      "main": [
+        [
+          {
+            "node": "Alert: Ingestion Failed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Keeps the AI knowledge base in step with Google Drive without any code change."
+  },
+  "tags": [
+    "urbancart",
+    "rag",
+    "knowledge-base"
+  ]
+}

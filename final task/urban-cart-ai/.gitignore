@@ -1,0 +1,27 @@
+# --- Secrets: never commit real credentials -----------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+google-service-account.json
+credentials.json
+
+# --- Dependencies / build -----------------------------------------------------
+node_modules/
+dist/
+*.tsbuildinfo
+
+# --- Runtime data -------------------------------------------------------------
+# Embedded PGlite database files, ingestion cache and the dry-run outbox.
+data/pglite/
+data/outbox/
+data/cache/
+*.log
+logs/
+
+# --- OS / editor --------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

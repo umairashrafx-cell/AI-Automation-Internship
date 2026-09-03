@@ -1,0 +1,27 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "timestamp": 1788344992830,
+    "call": {
+      "id": "call_demo_001",
+      "orgId": "org_demo",
+      "type": "inboundPhoneCall",
+      "customer": {
+        "number": "+923001234567"
+      },
+      "assistantId": "asst_demo"
+    },
+    "toolCalls": [
+      {
+        "id": "toolu_vapi_001",
+        "type": "function",
+        "function": {
+          "name": "getOrderStatus",
+          "arguments": {
+            "orderNumber": "UC-10452"
+          }
+        }
+      }
+    ]
+  }
+}

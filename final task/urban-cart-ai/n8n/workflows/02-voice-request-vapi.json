@@ -1,0 +1,412 @@
+{
+  "name": "UrbanCart 2 - Voice Request (Vapi)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urbancart/voice",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "vapi-webhook-012",
+      "name": "Vapi Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        300
+      ],
+      "notes": "Vapi server URL. Receives tool-calls, transcripts and end-of-call reports.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Vapi sends every call event to one URL. Only tool calls need work;\n// the rest are acknowledged so Vapi does not retry them.\nconst payload = $input.first().json.body ?? $input.first().json;\nconst headers = $input.first().json.headers ?? {};\n\n// Shared-secret check. Vapi sets this header on every server request.\nconst expected = $env.VAPI_WEBHOOK_SECRET;\nif (expected && headers['x-vapi-secret'] !== expected) {\n  return [{ json: { authorised: false, actionable: false, reason: 'bad x-vapi-secret' } }];\n}\n\nconst message = payload.message ?? {};\nconst actionable = message.type === 'tool-calls' || message.type === 'function-call';\n\nreturn [{\n  json: {\n    authorised: true,\n    actionable,\n    type: message.type ?? 'unknown',\n    callId: message.call?.id ?? null,\n    callerPhone: message.call?.customer?.number ?? null,\n    payload,\n  },\n}];"
+      },
+      "id": "verify-route-vapi-message-013",
+      "name": "Verify + Route Vapi Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "authorised-cond-014",
+              "leftValue": "={{ $json.authorised }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "authorised-015",
+      "name": "Authorised?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -80,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "tool-call-cond-016",
+              "leftValue": "={{ $json.actionable }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "tool-call-017",
+      "name": "Tool Call?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        140,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/voice/vapi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-execute-voice-tool-018",
+      "name": "Backend: Execute Voice Tool",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        140
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "The backend resolves each tool call against PostgreSQL / the vector store and returns speakable results.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "tool-ok-cond-019",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "tool-ok-020",
+      "name": "Tool OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-tool-results-021",
+      "name": "Respond: Tool Results",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 2 - Voice Request\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-voice-failure-022",
+      "name": "Report Voice Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        220
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ results: [{ toolCallId: 'unknown', result: \"I'm sorry, I can't check that at the moment. Let me pass you to a colleague who can help.\" }] }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-voice-fallback-023",
+      "name": "Respond: Voice Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1080,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-acknowledged-024",
+      "name": "Respond: Acknowledged",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: \"unauthorised\" }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "respond-unauthorised-025",
+      "name": "Respond: Unauthorised",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        140,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "Vapi Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify + Route Vapi Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify + Route Vapi Message": {
+      "main": [
+        [
+          {
+            "node": "Authorised?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorised?": {
+      "main": [
+        [
+          {
+            "node": "Tool Call?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Unauthorised",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool Call?": {
+      "main": [
+        [
+          {
+            "node": "Backend: Execute Voice Tool",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Acknowledged",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Execute Voice Tool": {
+      "main": [
+        [
+          {
+            "node": "Tool OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool OK?": {
+      "main": [
+        [
+          {
+            "node": "Respond: Tool Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Voice Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Voice Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Voice Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Vapi tool backend. Never returns a non-2xx to Vapi mid-call."
+  },
+  "tags": [
+    "urbancart",
+    "voice",
+    "vapi"
+  ]
+}

@@ -1,0 +1,365 @@
+{
+  "name": "UrbanCart 4 - Order Lookup",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "urbancart/order-status",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": false
+        }
+      },
+      "id": "order-webhook-038",
+      "name": "Order Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        300
+      ],
+      "notes": "Body: { orderNumber, phone?, name? }",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Accept \"UC-10452\", \"uc10452\" or a whole sentence containing it.\nconst body = $input.first().json.body ?? $input.first().json;\nconst raw = (body.orderNumber ?? body.message ?? '').toString();\n\nconst match = raw.match(/\\bUC[-\\s]?(\\d{5})\\b/i);\nconst orderNumber = match ? 'UC-' + match[1] : null;\n\nreturn [{\n  json: {\n    valid: orderNumber !== null,\n    orderNumber,\n    phone: body.phone ?? null,\n    name: body.name ?? null,\n  },\n}];"
+      },
+      "id": "extract-validate-order-number-039",
+      "name": "Extract + Validate Order Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "order-number-valid-cond-040",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "order-number-valid-041",
+      "name": "Order Number Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -60,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/tools/getOrderStatus",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.URBANCART_API_KEY }}"
+            },
+            {
+              "name": "X-Correlation-Id",
+              "value": "={{ $execution.id }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ orderNumber: $json.orderNumber, phone: $json.phone, name: $json.name }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "backend-get-order-status-042",
+      "name": "Backend: Get Order Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        180,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "notes": "The backend verifies ownership (phone or name on the order) before returning anything, and redacts the street address.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "lookup-ok-cond-043",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "lookup-ok-044",
+      "name": "Lookup OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        420,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = ($json.body ?? {}).data ?? {};\n// 'found' is the only outcome that carries order data. The other outcomes\n// (not_found, verification_required, invalid_format) carry only a safe message.\nreturn [{\n  json: {\n    success: true,\n    outcome: data.outcome,\n    message: data.message,\n    order: data.outcome === 'found' ? {\n      orderNumber: data.order?.orderNumber,\n      status: data.order?.status,\n      orderDate: data.order?.orderDate,\n      expectedDelivery: data.order?.expectedDelivery,\n      items: data.order?.items ?? [],\n      courier: data.order?.courier,\n      trackingNumber: data.order?.trackingNumber,\n    } : null,\n    needsAttention: data.needsAttention === true,\n  },\n}];"
+      },
+      "id": "shape-order-response-045",
+      "name": "Shape Order Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-order-status-046",
+      "name": "Respond: Order Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.URBANCART_API_URL }}/api/webhooks/workflow-error",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Signature",
+              "value": "={{ $env.URBANCART_WEBHOOK_SIGNATURE }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow: \"Workflow 4 - Order Lookup\", errorCode: 'N8N_STEP_FAILED', errorMessage: ($json.error && $json.error.message) || $json.statusCode + ' from backend', execution: { id: $execution.id } }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "report-order-failure-047",
+      "name": "Report Order Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: \"I can't reach our order system at the moment. I've flagged it and our support team will check this for you.\" }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-order-fallback-048",
+      "name": "Respond: Order Fallback",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, message: \"That order number doesn't look like one of ours. UrbanCart order numbers look like UC-10452. Could you double-check it?\" }) }}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "respond-bad-order-number-049",
+      "name": "Respond: Bad Order Number",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        180,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Order Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract + Validate Order Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract + Validate Order Number": {
+      "main": [
+        [
+          {
+            "node": "Order Number Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order Number Valid?": {
+      "main": [
+        [
+          {
+            "node": "Backend: Get Order Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Bad Order Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend: Get Order Status": {
+      "main": [
+        [
+          {
+            "node": "Lookup OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup OK?": {
+      "main": [
+        [
+          {
+            "node": "Shape Order Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Order Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shape Order Response": {
+      "main": [
+        [
+          {
+            "node": "Respond: Order Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Order Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond: Order Fallback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "errorWorkflow": "",
+    "timezone": "Asia/Karachi"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "urbancart-demo",
+    "description": "Order status with ownership verification."
+  },
+  "tags": [
+    "urbancart",
+    "orders"
+  ]
+}
